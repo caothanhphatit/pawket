@@ -2,6 +2,7 @@ package com.pawket.memberships.adapter.in.rest;
 
 import com.pawket.memberships.domain.model.MembershipRole;
 import com.pawket.memberships.domain.model.PetMembership;
+import jakarta.validation.constraints.NotNull;
 import java.time.Instant;
 import java.util.UUID;
 
@@ -20,4 +21,6 @@ final class MembershipDtos {
                     membership.role(), membership.joinedAt());
         }
     }
+
+    record UpdateMemberRoleRequest(@NotNull MembershipRole role) {}
 }

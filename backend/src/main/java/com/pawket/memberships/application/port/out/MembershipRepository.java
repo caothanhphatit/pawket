@@ -17,4 +17,6 @@ public interface MembershipRepository {
     void createOwner(UUID membershipId, UUID petId, UUID userId, Instant joinedAt);
 
     void remove(UUID membershipId, Instant removedAt);
+
+    void updateRole(UUID membershipId, MembershipRole role);
 }

@@ -17,8 +17,9 @@ import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 @ApplicationScoped
 public class MediaService {
-    private static final Set<String> IMAGE_TYPES = Set.of("image/jpeg", "image/png", "image/webp", "image/heic");
-    private static final Set<String> VIDEO_TYPES = Set.of("video/mp4", "video/quicktime");
+    private static final Set<String> IMAGE_TYPES = Set.of(
+            "image/jpeg", "image/png", "image/webp", "image/heic", "image/heif");
+    private static final long MAX_IMAGE_PIXELS = 50_000_000L;
 
     private final EntityManager entityManager;
     private final StoragePresigner storagePresigner;
@@ -36,6 +37,7 @@ public class MediaService {
     @Transactional
     public UploadIntentResponse createIntent(UUID userId, CreateUploadIntentRequest request) {
         var mediaType = resolveMediaType(request.mimeType());
+        validateDimensions(request.width(), request.height());
         var id = UUID.randomUUID();
         var extension = safeExtension(request.fileName());
         var storageKey = "users/%s/%s/%s%s".formatted(
@@ -63,6 +65,9 @@ public class MediaService {
     @Transactional
     public MediaResponse complete(UUID userId, UUID mediaId) {
         var entity = findOwned(userId, mediaId);
+        if (!"IMAGE".equals(entity.mediaType) || !IMAGE_TYPES.contains(entity.mimeType.toLowerCase(Locale.ROOT))) {
+            throw new BadRequestException("Only image uploads can be completed");
+        }
         if (!"PENDING_UPLOAD".equals(entity.status) && !"UPLOADED".equals(entity.status)) {
             throw new BadRequestException("Media cannot be completed from status " + entity.status);
         }
@@ -131,8 +136,16 @@ public class MediaService {
     private static String resolveMediaType(String mimeType) {
         var normalized = mimeType.toLowerCase(Locale.ROOT);
         if (IMAGE_TYPES.contains(normalized)) return "IMAGE";
-        if (VIDEO_TYPES.contains(normalized)) return "VIDEO";
-        throw new BadRequestException("Unsupported media type");
+        throw new BadRequestException("Only JPEG, PNG, WebP, HEIC, or HEIF images are supported");
+    }
+
+    private static void validateDimensions(Integer width, Integer height) {
+        if ((width == null) != (height == null)) {
+            throw new BadRequestException("Image width and height must be provided together");
+        }
+        if (width != null && (long) width * height > MAX_IMAGE_PIXELS) {
+            throw new BadRequestException("Image dimensions are too large");
+        }
     }
 
     private static String safeExtension(String fileName) {

@@ -1,6 +1,7 @@
 package com.pawket.pets.adapter.in.rest;
 
 import static io.restassured.RestAssured.given;
+import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.hasItem;
 import static org.hamcrest.Matchers.not;
@@ -404,6 +405,131 @@ class PetResourceTest {
                 .setParameter("mediaId", mediaId)
                 .getSingleResult();
         org.junit.jupiter.api.Assertions.assertEquals(firstPostId, attachedPostId);
+    }
+
+    @Test
+    void authorCanUpdateAndSoftDeleteMemory() throws Exception {
+        var petId = createPet("Memory lifecycle test pet");
+        var mediaId = createReadyMedia();
+        var postId = UUID.fromString(given()
+                .contentType(ContentType.JSON)
+                .body("""
+                        {
+                          "caption": "Original caption",
+                          "capturedAt": "2026-07-18T08:30:00Z",
+                          "visibility": "PET_MEMBERS",
+                          "petIds": ["%s"],
+                          "mediaIds": ["%s"]
+                        }
+                        """.formatted(petId, mediaId))
+                .when().post("/api/v1/posts")
+                .then().statusCode(201)
+                .body("data.version", equalTo(0))
+                .extract().path("data.id"));
+        createdPostIds.add(postId);
+
+        var updateKey = UUID.randomUUID().toString();
+        idempotencyKeys.add(updateKey);
+        var updateBody = "{\"caption\":\"Updated caption\",\"visibility\":\"PRIVATE\",\"version\":0}";
+        given()
+                .header("Idempotency-Key", updateKey)
+                .contentType(ContentType.JSON)
+                .body(updateBody)
+                .when().patch("/api/v1/posts/{postId}", postId)
+                .then().statusCode(200)
+                .header("ETag", notNullValue())
+                .body("data.caption", equalTo("Updated caption"))
+                .body("data.visibility", equalTo("PRIVATE"))
+                .body("data.version", equalTo(1));
+
+        // A network retry with the same key replays the successful versioned response.
+        given()
+                .header("Idempotency-Key", updateKey)
+                .contentType(ContentType.JSON)
+                .body(updateBody)
+                .when().patch("/api/v1/posts/{postId}", postId)
+                .then().statusCode(200)
+                .body("data.version", equalTo(1));
+
+        given()
+                .contentType(ContentType.JSON)
+                .body("{\"caption\":null,\"version\":0}")
+                .when().patch("/api/v1/posts/{postId}", postId)
+                .then().statusCode(409)
+                .body("code", equalTo("POST_VERSION_CONFLICT"));
+
+        given()
+                .header("X-User-Id", OTHER_USER_ID)
+                .contentType(ContentType.JSON)
+                .body("{\"caption\":\"Unauthorized\",\"version\":1}")
+                .when().patch("/api/v1/posts/{postId}", postId)
+                .then().statusCode(403)
+                .body("code", equalTo("POST_UPDATE_FORBIDDEN"));
+
+        given()
+                .header("X-User-Id", OTHER_USER_ID)
+                .when().delete("/api/v1/posts/{postId}", postId)
+                .then().statusCode(403)
+                .body("code", equalTo("POST_DELETE_FORBIDDEN"));
+
+        given().when().delete("/api/v1/posts/{postId}", postId).then().statusCode(204);
+        given().when().delete("/api/v1/posts/{postId}", postId).then().statusCode(204);
+        given().when().get("/api/v1/posts/{postId}", postId).then().statusCode(404);
+        given().when().get("/api/v1/media/{mediaId}/content", mediaId).then().statusCode(404);
+
+        given()
+                .queryParam("petId", petId)
+                .when().get("/api/v1/feed")
+                .then().statusCode(200)
+                .body("data.id", not(hasItem(postId.toString())));
+
+        String mediaStatus = (String) entityManager.createNativeQuery(
+                        "select status from media where id = :mediaId", String.class)
+                .setParameter("mediaId", mediaId)
+                .getSingleResult();
+        org.junit.jupiter.api.Assertions.assertEquals("DELETED", mediaStatus);
+    }
+
+    @Test
+    void currentUserCanExportPortableProfileAndMemoryData() throws Exception {
+        var petId = createPet("Export test pet");
+        var mediaId = createReadyMedia();
+        var postId = UUID.fromString(given()
+                .contentType(ContentType.JSON)
+                .body("""
+                        {
+                          "caption": "Exported memory",
+                          "capturedAt": "2026-07-18T08:30:00Z",
+                          "visibility": "PET_MEMBERS",
+                          "petIds": ["%s"],
+                          "mediaIds": ["%s"]
+                        }
+                        """.formatted(petId, mediaId))
+                .when().post("/api/v1/posts")
+                .then().statusCode(201)
+                .extract().path("data.id"));
+        createdPostIds.add(postId);
+        given()
+                .contentType(ContentType.JSON)
+                .body("{\"type\":\"PAW\"}")
+                .when().put("/api/v1/posts/{postId}/reaction", postId)
+                .then().statusCode(200);
+
+        given()
+                .when().get("/api/v1/users/me/export")
+                .then().statusCode(200)
+                .contentType(ContentType.JSON)
+                .header("Content-Disposition", containsString("pawket-user-export.json"))
+                .body("format", equalTo("pawket-user-export-v1"))
+                .body("user.id", equalTo(DEV_USER_ID.toString()))
+                .body("pets.find { it.id == '%s' }.membershipRole".formatted(petId), equalTo("OWNER"))
+                .body("authoredPosts.find { it.id == '%s' }.caption".formatted(postId), equalTo("Exported memory"))
+                .body("authoredPosts.find { it.id == '%s' }.petIds".formatted(postId), hasItem(petId.toString()))
+                .body("authoredPosts.find { it.id == '%s' }.media[0].id".formatted(postId), equalTo(mediaId.toString()))
+                .body("reactions.find { it.postId == '%s' }.type".formatted(postId), equalTo("PAW"))
+                .body(not(containsString("storageKey")))
+                .body(not(containsString("uploadUrl")))
+                .body(not(containsString("token")));
     }
 
     private UUID createPet(String name) {

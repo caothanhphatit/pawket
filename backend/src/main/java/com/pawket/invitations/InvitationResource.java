@@ -8,13 +8,16 @@ import com.pawket.shared.idempotency.IdempotencyService;
 import jakarta.validation.Valid;
 import jakarta.ws.rs.Consumes;
 import jakarta.ws.rs.GET;
+import jakarta.ws.rs.DELETE;
 import jakarta.ws.rs.HeaderParam;
 import jakarta.ws.rs.POST;
 import jakarta.ws.rs.Path;
 import jakarta.ws.rs.PathParam;
+import jakarta.ws.rs.QueryParam;
 import jakarta.ws.rs.Produces;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
+import java.util.UUID;
 
 @Path("/api/v1/invitations")
 @Consumes(MediaType.APPLICATION_JSON)
@@ -51,6 +54,15 @@ public class InvitationResource {
     }
 
     @GET
+    public Object listPending(@QueryParam("petId") UUID petId) {
+        if (petId == null) {
+            throw com.pawket.shared.error.ApiException.badRequest(
+                    "PET_ID_REQUIRED", "petId is required.");
+        }
+        return new DataResponse<>(invitationService.listPending(currentActor.userId(), petId));
+    }
+
+    @GET
     @Path("/{token}")
     public Object preview(@PathParam("token") String token) {
         return new DataResponse<>(invitationService.preview(token));
@@ -70,5 +82,11 @@ public class InvitationResource {
                 InvitationDtos.InvitationAcceptedResponse.class,
                 () -> invitationService.accept(actorId, request.token()));
         return new DataResponse<>(result);
+    }
+
+    @DELETE
+    @Path("/{invitationId}")
+    public void revoke(@PathParam("invitationId") UUID invitationId) {
+        invitationService.revoke(currentActor.userId(), invitationId);
     }
 }

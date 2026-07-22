@@ -26,12 +26,7 @@ public class MembershipCommandService {
 
     @Transactional
     public void remove(UUID petId, UUID targetUserId, UUID actorId) {
-        var actorRole = memberships.findActiveRole(petId, actorId)
-                .orElseThrow(() -> ApiException.notFound("PET_NOT_FOUND", "Pet was not found."));
-        if (actorRole != MembershipRole.OWNER) {
-            throw ApiException.forbidden("MEMBER_REMOVE_FORBIDDEN", "Only an owner can remove pet members.");
-        }
-
+        requireOwner(petId, actorId, "MEMBER_REMOVE_FORBIDDEN", "Only an owner can remove pet members.");
         var target = memberships.findActive(petId, targetUserId)
                 .orElseThrow(() -> ApiException.notFound("MEMBER_NOT_FOUND", "Pet member was not found."));
         if (target.role() == MembershipRole.OWNER) {
@@ -42,5 +37,32 @@ public class MembershipCommandService {
 
         memberships.remove(target.id(), clock.instant());
         auditService.record(actorId, "PET_MEMBER_REMOVED", "PET_MEMBERSHIP", target.id());
+    }
+
+    @Transactional
+    public void updateRole(UUID petId, UUID targetUserId, MembershipRole role, UUID actorId) {
+        requireOwner(petId, actorId, "MEMBER_ROLE_UPDATE_FORBIDDEN", "Only an owner can change member roles.");
+        if (role == MembershipRole.OWNER) {
+            throw ApiException.badRequest(
+                    "OWNER_ROLE_CHANGE_NOT_ALLOWED",
+                    "Ownership changes require the ownership transfer flow.");
+        }
+        var target = memberships.findActive(petId, targetUserId)
+                .orElseThrow(() -> ApiException.notFound("MEMBER_NOT_FOUND", "Pet member was not found."));
+        if (target.role() == MembershipRole.OWNER) {
+            throw ApiException.badRequest(
+                    "OWNER_ROLE_CHANGE_NOT_ALLOWED",
+                    "An owner's role cannot be changed without an ownership transfer.");
+        }
+        if (target.role() == role) return;
+
+        memberships.updateRole(target.id(), role);
+        auditService.record(actorId, "PET_MEMBER_ROLE_UPDATED", "PET_MEMBERSHIP", target.id());
+    }
+
+    private void requireOwner(UUID petId, UUID actorId, String code, String message) {
+        var actorRole = memberships.findActiveRole(petId, actorId)
+                .orElseThrow(() -> ApiException.notFound("PET_NOT_FOUND", "Pet was not found."));
+        if (actorRole != MembershipRole.OWNER) throw ApiException.forbidden(code, message);
     }
 }

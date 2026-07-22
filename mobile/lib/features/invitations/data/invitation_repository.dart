@@ -14,6 +14,8 @@ abstract interface class InvitationRepository {
     String token, {
     required String idempotencyKey,
   });
+  Future<List<InvitationDto>> listPendingInvitations(String petId);
+  Future<void> revokeInvitation(String invitationId);
 }
 
 class RemoteInvitationRepository implements InvitationRepository {
@@ -57,6 +59,23 @@ class RemoteInvitationRepository implements InvitationRepository {
       idempotencyKey: idempotencyKey,
     );
     return invitation;
+  }
+
+  @override
+  Future<List<InvitationDto>> listPendingInvitations(String petId) async {
+    final response = await _apiClient.get<Object>(
+      '/invitations',
+      queryParameters: {'petId': petId},
+    );
+    return requireJsonList(
+      unwrapData(response.data),
+      context: 'pending invitations',
+    ).map(InvitationDto.fromJson).toList(growable: false);
+  }
+
+  @override
+  Future<void> revokeInvitation(String invitationId) async {
+    await _apiClient.delete<void>('/invitations/$invitationId');
   }
 
   InvitationDto _invitation(

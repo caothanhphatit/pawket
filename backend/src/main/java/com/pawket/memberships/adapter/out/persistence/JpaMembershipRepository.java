@@ -92,4 +92,16 @@ public class JpaMembershipRepository implements MembershipRepository {
                 .setParameter("removedAt", removedAt)
                 .executeUpdate();
     }
+
+    @Override
+    public void updateRole(UUID membershipId, MembershipRole role) {
+        entityManager.createQuery("""
+                        update PetMembershipEntity m
+                        set m.role = :role
+                        where m.id = :membershipId and m.status = 'ACTIVE'
+                        """)
+                .setParameter("membershipId", membershipId)
+                .setParameter("role", role.name())
+                .executeUpdate();
+    }
 }

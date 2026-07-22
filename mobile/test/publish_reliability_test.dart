@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:image/image.dart' as image;
 import 'package:pawket_mobile/app/bootstrap/app_providers.dart';
 import 'package:pawket_mobile/core/network/api_exception.dart';
 import 'package:pawket_mobile/features/pets/application/pet_providers.dart';
@@ -10,6 +11,7 @@ import 'package:pawket_mobile/features/pets/data/pet_dto.dart';
 import 'package:pawket_mobile/features/pets/data/pet_repository.dart';
 import 'package:pawket_mobile/features/pets/domain/pet.dart';
 import 'package:pawket_mobile/features/posts/data/post_dto.dart';
+import 'package:pawket_mobile/features/posts/domain/photo_filter.dart';
 import 'package:pawket_mobile/features/posts/presentation/capture_draft.dart';
 
 void main() {
@@ -33,6 +35,44 @@ void main() {
     );
 
     expect(request.toJson(), isNot(contains('caption')));
+  });
+
+  test('post updates can clear caption and change audience', () {
+    const request = UpdatePostRequest(
+      caption: '   ',
+      visibility: 'PRIVATE',
+      version: 3,
+    );
+
+    expect(request.toJson(), {
+      'caption': null,
+      'visibility': 'PRIVATE',
+      'version': 3,
+    });
+  });
+
+  test('default photo polish bakes EXIF orientation before encoding', () async {
+    final source = image.Image(width: 2, height: 3)
+      ..exif.imageIfd.orientation = 6;
+    final filtered = await PawketPhotoFilter.applyToBytes(
+      image.encodeJpg(source),
+    );
+    final decoded = image.decodeJpg(filtered!);
+
+    expect(decoded?.width, 3);
+    expect(decoded?.height, 2);
+    expect(decoded?.exif.imageIfd.orientation, isNot(6));
+  });
+
+  test('upload preparation bounds the longest image dimension', () async {
+    final source = image.Image(width: 2400, height: 600);
+    final prepared = await PawketPhotoFilter.prepareForUpload(
+      image.encodeJpg(source),
+    );
+
+    expect(prepared.width, PawketPhotoFilter.maxOutputDimension);
+    expect(prepared.height, 512);
+    expect(prepared.bytes, isNotEmpty);
   });
 
   test('offline pet creation fails without adding a fake pet', () async {

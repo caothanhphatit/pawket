@@ -1,21 +1,26 @@
 package com.pawket.memberships.adapter.in.rest;
 
 import com.pawket.memberships.adapter.in.rest.MembershipDtos.MemberResponse;
+import com.pawket.memberships.adapter.in.rest.MembershipDtos.UpdateMemberRoleRequest;
 import com.pawket.memberships.application.MembershipQueryService;
 import com.pawket.memberships.application.MembershipCommandService;
 import com.pawket.shared.api.DataResponse;
 import com.pawket.shared.auth.CurrentActorProvider;
 import jakarta.ws.rs.DELETE;
 import jakarta.ws.rs.GET;
+import jakarta.ws.rs.PATCH;
 import jakarta.ws.rs.Path;
 import jakarta.ws.rs.PathParam;
 import jakarta.ws.rs.Produces;
+import jakarta.ws.rs.Consumes;
+import jakarta.validation.Valid;
 import jakarta.ws.rs.core.MediaType;
 import java.util.List;
 import java.util.UUID;
 
 @Path("/api/v1/pets/{petId}/members")
 @Produces(MediaType.APPLICATION_JSON)
+@Consumes(MediaType.APPLICATION_JSON)
 public class MembershipResource {
     private final MembershipQueryService queries;
     private final MembershipCommandService commands;
@@ -44,5 +49,14 @@ public class MembershipResource {
             @PathParam("petId") UUID petId,
             @PathParam("userId") UUID userId) {
         commands.remove(petId, userId, currentActor.userId());
+    }
+
+    @PATCH
+    @Path("/{userId}")
+    public void updateRole(
+            @PathParam("petId") UUID petId,
+            @PathParam("userId") UUID userId,
+            @Valid UpdateMemberRoleRequest request) {
+        commands.updateRole(petId, userId, request.role(), currentActor.userId());
     }
 }

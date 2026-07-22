@@ -6,6 +6,7 @@ import 'package:pawket_mobile/features/home/presentation/home_screen.dart';
 import 'package:pawket_mobile/features/invitations/presentation/create_invitation_screen.dart';
 import 'package:pawket_mobile/features/invitations/presentation/invitation_screen.dart';
 import 'package:pawket_mobile/features/memberships/presentation/members_screen.dart';
+import 'package:pawket_mobile/features/milestones/presentation/create_milestone_screen.dart';
 import 'package:pawket_mobile/features/pets/presentation/create_pet_screen.dart';
 import 'package:pawket_mobile/features/pets/presentation/edit_pet_screen.dart';
 import 'package:pawket_mobile/features/pets/presentation/pet_profile_screen.dart';
@@ -14,6 +15,10 @@ import 'package:pawket_mobile/features/posts/presentation/capture_draft.dart';
 import 'package:pawket_mobile/features/posts/presentation/capture_screen.dart';
 import 'package:pawket_mobile/features/posts/presentation/post_detail_screen.dart';
 import 'package:pawket_mobile/features/posts/data/post_dto.dart';
+import 'package:pawket_mobile/features/reminders/presentation/daily_reminder_screen.dart';
+import 'package:pawket_mobile/features/timeline/presentation/pet_calendar_screen.dart';
+import 'package:pawket_mobile/features/timeline/presentation/weekly_recap_screen.dart';
+import 'package:pawket_mobile/features/timeline/presentation/import_memories_screen.dart';
 
 import 'pawket_navigation.dart';
 
@@ -57,6 +62,19 @@ final appRouter = GoRouter(
     ),
     GoRoute(path: '/you', builder: (_, _) => const AccountScreen()),
     GoRoute(
+      path: '/settings/reminders',
+      builder: (_, _) => const DailyReminderScreen(),
+    ),
+    GoRoute(path: '/calendar', builder: (_, _) => const PetCalendarScreen()),
+    GoRoute(path: '/recap', builder: (_, _) => const WeeklyRecapScreen()),
+    GoRoute(
+      path: '/memories/import',
+      pageBuilder: (_, _) => const MaterialPage(
+        fullscreenDialog: true,
+        child: ImportMemoriesScreen(),
+      ),
+    ),
+    GoRoute(
       path: '/compose',
       pageBuilder: (_, state) => MaterialPage(
         fullscreenDialog: true,
@@ -86,6 +104,13 @@ final appRouter = GoRouter(
       path: '/pets/:petId/members',
       builder: (_, state) =>
           MembersScreen(petId: state.pathParameters['petId']!),
+    ),
+    GoRoute(
+      path: '/pets/:petId/milestones/new',
+      pageBuilder: (_, state) => MaterialPage(
+        fullscreenDialog: true,
+        child: CreateMilestoneScreen(petId: state.pathParameters['petId']!),
+      ),
     ),
     GoRoute(
       path: '/pets/:petId/invite',

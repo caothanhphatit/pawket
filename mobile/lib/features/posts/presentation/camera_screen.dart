@@ -25,7 +25,6 @@ class _CameraScreenState extends State<CameraScreen>
   bool isInitializing = true;
   bool isCapturing = false;
   FlashMode flashMode = FlashMode.off;
-  PhotoFilter photoFilter = PhotoFilter.original;
   _CameraFailure? cameraFailure;
   int _cameraGeneration = 0;
 
@@ -130,11 +129,7 @@ class _CameraScreenState extends State<CameraScreen>
       if (mounted) {
         await context.push(
           '/compose',
-          extra: CaptureDraft(
-            media: media,
-            capturedAt: capturedAt,
-            filter: photoFilter,
-          ),
+          extra: CaptureDraft(media: media, capturedAt: capturedAt),
         );
       }
     } catch (_) {
@@ -241,20 +236,11 @@ class _CameraScreenState extends State<CameraScreen>
                         controller: controller,
                         initializing: isInitializing,
                         failure: cameraFailure,
-                        filter: photoFilter,
                         onRetry: _loadCameras,
                       ),
                     ),
                   ),
-                  const SizedBox(height: 14),
-                  _FilterPicker(
-                    selected: photoFilter,
-                    enabled: !isCapturing && !isInitializing,
-                    onSelected: (filter) {
-                      setState(() => photoFilter = filter);
-                    },
-                  ),
-                  const SizedBox(height: 14),
+                  const SizedBox(height: 24),
                   SizedBox(
                     width: 240,
                     height: 76,
@@ -306,14 +292,12 @@ class _CameraPreview extends StatelessWidget {
     required this.controller,
     required this.initializing,
     required this.failure,
-    required this.filter,
     required this.onRetry,
   });
 
   final CameraController? controller;
   final bool initializing;
   final _CameraFailure? failure;
-  final PhotoFilter filter;
   final Future<void> Function() onRetry;
 
   @override
@@ -323,7 +307,7 @@ class _CameraPreview extends StatelessWidget {
       final previewSize = activeController.value.previewSize;
       return ColoredBox(
         color: Colors.black,
-        child: filter.applyTo(
+        child: PawketPhotoFilter.applyTo(
           FittedBox(
             fit: BoxFit.cover,
             child: SizedBox(
@@ -381,40 +365,6 @@ class _CameraPreview extends StatelessWidget {
                   ],
                 ),
               ),
-      ),
-    );
-  }
-}
-
-class _FilterPicker extends StatelessWidget {
-  const _FilterPicker({
-    required this.selected,
-    required this.enabled,
-    required this.onSelected,
-  });
-
-  final PhotoFilter selected;
-  final bool enabled;
-  final ValueChanged<PhotoFilter> onSelected;
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      height: 38,
-      child: ListView.separated(
-        shrinkWrap: true,
-        scrollDirection: Axis.horizontal,
-        itemCount: PhotoFilter.values.length,
-        separatorBuilder: (_, _) => const SizedBox(width: 8),
-        itemBuilder: (context, index) {
-          final filter = PhotoFilter.values[index];
-          return ChoiceChip(
-            label: Text(filter.label),
-            selected: selected == filter,
-            onSelected: enabled ? (_) => onSelected(filter) : null,
-            visualDensity: VisualDensity.compact,
-          );
-        },
       ),
     );
   }

@@ -10,7 +10,7 @@ class ApiConfig {
   factory ApiConfig.fromEnvironment() {
     const baseUrl = String.fromEnvironment(
       'PAWKET_API_BASE_URL',
-      defaultValue: 'http://localhost:8080/api/v1',
+      defaultValue: 'https://v2.poeviethoa.net/api/v1',
     );
     const devUserId = String.fromEnvironment('PAWKET_DEV_USER_ID');
 

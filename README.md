@@ -7,17 +7,17 @@ Pawket is a private, long-lived pet profile and memory app. The MVP opens on the
 Included:
 
 - Flutter client for web, iOS, and Android with camera-first navigation.
-- Multiple editable pet profiles, optional onboarding with up to five photos, and quick switching from Profile.
-- Camera or photo-library selection, pet tagging, media upload, and memory publishing.
-- Per-pet feed and newest-first lifetime memory timeline.
-- Reactions, pet members, role-based invitations, and basic member/private visibility.
+- Mandatory first-pet onboarding with up to five optional starter photos, editable profiles, milestones, and Profile-only pet switching.
+- Square camera capture with one subtle default polish, reliable media upload, retry, and current-pet memory publishing.
+- Per-pet feed, newest-first timeline, edit/delete, monthly calendar, old-photo import, and shareable weekly recap.
+- Daily local reminders, reactions, member roles, pending invitation management, and member/private visibility.
 - Quarkus REST API, PostgreSQL persistence, Flyway migrations, and private S3-compatible media storage.
 
 Not included in this MVP:
 
 - Automatic dog/cat or individual-pet identification.
 - Marketplace, buying/selling, payments, or ownership transfer.
-- Push notifications, production identity-provider setup, moderation, or production deployment automation.
+- Remote push notifications, production identity-provider setup, moderation, or production deployment automation.
 
 Local development uses a fixed development user (or `X-User-Id`) while the OIDC integration boundary remains disabled by default.
 

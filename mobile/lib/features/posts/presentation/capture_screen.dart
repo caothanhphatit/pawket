@@ -10,6 +10,7 @@ import 'package:pawket_mobile/features/feed/application/feed_providers.dart';
 import 'package:pawket_mobile/core/network/api_exception.dart';
 import 'package:pawket_mobile/features/media/data/media_dto.dart';
 import 'package:pawket_mobile/features/pets/application/pet_providers.dart';
+import 'package:pawket_mobile/features/pets/presentation/widgets/pet_avatar.dart';
 import 'package:pawket_mobile/features/posts/data/post_dto.dart';
 import 'package:pawket_mobile/features/posts/domain/photo_filter.dart';
 import 'package:pawket_mobile/features/posts/presentation/capture_draft.dart';
@@ -24,20 +25,15 @@ class CaptureScreen extends ConsumerStatefulWidget {
 }
 
 class _CaptureScreenState extends ConsumerState<CaptureScreen> {
-  late final Set<String> selectedPetIds;
   final captionController = TextEditingController();
   bool isPublishing = false;
   double uploadProgress = 0;
-  bool didInitializePetSelection = false;
   String visibility = 'PET_MEMBERS';
-
-  @override
-  void initState() {
-    super.initState();
-    final activeId = ref.read(activePetIdProvider);
-    selectedPetIds = {?activeId};
-    didInitializePetSelection = activeId != null;
-  }
+  String? publishError;
+  PreparedPhoto? _preparedPhoto;
+  String? _completedMediaId;
+  final _uploadIdempotencyKey = const Uuid().v4();
+  final _postIdempotencyKey = const Uuid().v4();
 
   @override
   void dispose() {
@@ -47,56 +43,55 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final pets = ref.watch(petsProvider);
-    final activeId = ref.watch(activePetIdProvider);
-    if (!didInitializePetSelection &&
-        activeId != null &&
-        pets.any((pet) => pet.id == activeId)) {
-      selectedPetIds.add(activeId);
-      didInitializePetSelection = true;
-    }
+    final activePet = ref.watch(activePetProvider);
 
     return Scaffold(
       appBar: AppBar(title: const Text('New memory')),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
         children: [
-          _MediaPreview(
-            media: widget.draft?.media,
-            filter: widget.draft?.filter ?? PhotoFilter.original,
-          ),
+          _MediaPreview(media: widget.draft?.media),
           const SizedBox(height: 24),
-          Text(
-            'Who is here? *',
-            style: Theme.of(context).textTheme.titleMedium,
-          ),
-          const SizedBox(height: 10),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              for (final pet in pets)
-                FilterChip(
-                  label: Text(pet.name),
-                  selected: selectedPetIds.contains(pet.id),
-                  onSelected: (selected) {
-                    setState(() {
-                      if (selected) {
-                        selectedPetIds.add(pet.id);
-                      } else {
-                        selectedPetIds.remove(pet.id);
-                      }
-                    });
-                  },
-                ),
-            ],
-          ),
-          if (pets.isEmpty)
-            const Padding(
-              padding: EdgeInsets.only(top: 8),
-              child: Text(
-                'Create a pet profile before publishing a memory.',
-                style: TextStyle(color: PawketColors.inkMuted),
+          if (activePet != null)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              decoration: BoxDecoration(
+                color: PawketColors.surface,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: PawketColors.outline),
+              ),
+              child: Row(
+                children: [
+                  PetAvatar(pet: activePet),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'SAVING TO',
+                          style: TextStyle(
+                            color: PawketColors.inkMuted,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 1.2,
+                          ),
+                        ),
+                        Text(
+                          activePet.name,
+                          style: const TextStyle(
+                            fontSize: 17,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const Tooltip(
+                    message: 'Change the current pet from Profile',
+                    child: Icon(Icons.lock_outline, size: 19),
+                  ),
+                ],
               ),
             ),
           const SizedBox(height: 20),
@@ -132,10 +127,13 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen> {
                     setState(() => visibility = selection.single);
                   },
           ),
+          if (publishError != null) ...[
+            const SizedBox(height: 16),
+            _PublishError(message: publishError!),
+          ],
           const SizedBox(height: 20),
           FilledButton.icon(
-            onPressed:
-                selectedPetIds.isEmpty || widget.draft == null || isPublishing
+            onPressed: activePet == null || widget.draft == null || isPublishing
                 ? null
                 : _publish,
             style: FilledButton.styleFrom(
@@ -154,7 +152,9 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen> {
             label: Text(
               isPublishing
                   ? 'Publishing ${(uploadProgress * 100).round()}%'
-                  : 'Publish memory',
+                  : publishError == null
+                  ? 'Publish memory'
+                  : 'Retry publish',
             ),
           ),
         ],
@@ -164,62 +164,66 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen> {
 
   Future<void> _publish() async {
     final draft = widget.draft;
-    if (draft == null || selectedPetIds.isEmpty) return;
+    final activePet = ref.read(activePetProvider);
+    if (draft == null || activePet == null) return;
     final media = draft.media;
     setState(() {
       isPublishing = true;
       uploadProgress = 0;
+      publishError = null;
     });
 
     try {
-      final originalBytes = Uint8List.fromList(await media.readAsBytes());
-      final bytes = await draft.filter.applyToBytes(originalBytes);
-      final mimeType = draft.filter.changesImage
-          ? 'image/png'
-          : _mimeType(media.name);
+      final prepared = _preparedPhoto ??=
+          await PawketPhotoFilter.prepareForUpload(await media.readAsBytes());
+      const mimeType = 'image/jpeg';
       final originalFileName = media.name.trim().isEmpty
           ? 'capture-${DateTime.now().millisecondsSinceEpoch}.jpg'
           : media.name;
-      final fileName = draft.filter.changesImage
-          ? '${originalFileName.replaceFirst(RegExp(r'\.[^.]+$'), '')}.png'
-          : originalFileName;
-      final mediaRepository = ref.read(mediaRepositoryProvider);
-      final intent = await mediaRepository.createUploadIntent(
-        CreateUploadIntentRequest(
-          fileName: fileName,
-          mimeType: mimeType,
-          byteSize: bytes.length,
-          purpose: MediaPurpose.post,
-        ),
-        idempotencyKey: const Uuid().v4(),
-      );
-      await mediaRepository.upload(
-        intent: intent,
-        bytesOrStream: bytes,
-        contentType: mimeType,
-        contentLength: bytes.length,
-        onProgress: (sent, total) {
-          if (!mounted || total <= 0) return;
-          setState(() => uploadProgress = sent / total);
-        },
-      );
-      final completed = await mediaRepository.completeUpload(intent.mediaId);
+      final fileName =
+          '${originalFileName.replaceFirst(RegExp(r'\.[^.]+$'), '')}.jpg';
+      var mediaId = _completedMediaId;
+      if (mediaId == null) {
+        final mediaRepository = ref.read(mediaRepositoryProvider);
+        final intent = await mediaRepository.createUploadIntent(
+          CreateUploadIntentRequest(
+            fileName: fileName,
+            mimeType: mimeType,
+            byteSize: prepared.bytes.length,
+            purpose: MediaPurpose.post,
+            width: prepared.width,
+            height: prepared.height,
+          ),
+          idempotencyKey: _uploadIdempotencyKey,
+        );
+        await mediaRepository.upload(
+          intent: intent,
+          bytesOrStream: prepared.bytes,
+          contentType: mimeType,
+          contentLength: prepared.bytes.length,
+          onProgress: (sent, total) {
+            if (!mounted || total <= 0) return;
+            setState(() => uploadProgress = sent / total);
+          },
+        );
+        final completed = await mediaRepository.completeUpload(intent.mediaId);
+        mediaId = completed.id;
+        _completedMediaId = mediaId;
+      }
       await ref
           .read(postRepositoryProvider)
           .createPost(
             CreatePostRequest(
-              petIds: selectedPetIds.toList(growable: false),
-              mediaIds: [completed.id],
+              petIds: [activePet.id],
+              mediaIds: [mediaId],
               capturedAt: draft.capturedAt,
               caption: captionController.text,
               visibility: visibility,
             ),
-            idempotencyKey: const Uuid().v4(),
+            idempotencyKey: _postIdempotencyKey,
           );
-      for (final petId in selectedPetIds) {
-        ref.invalidate(petFeedProvider(petId));
-        ref.invalidate(petMemoriesProvider(petId));
-      }
+      ref.invalidate(petFeedProvider(activePet.id));
+      ref.invalidate(petMemoriesProvider(activePet.id));
       if (mounted) Navigator.pop(context);
     } catch (error) {
       if (!mounted) return;
@@ -231,34 +235,55 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen> {
       setState(() {
         isPublishing = false;
         uploadProgress = 0;
+        publishError = _errorText(error);
       });
     }
-  }
-
-  String _mimeType(String fileName) {
-    final extension = fileName.split('.').last.toLowerCase();
-    return switch (extension) {
-      'png' => 'image/png',
-      'webp' => 'image/webp',
-      'heic' || 'heif' => 'image/heic',
-      _ => 'image/jpeg',
-    };
   }
 
   String _errorText(Object error) {
     if (error is ValidationException && error.errors.isNotEmpty) {
       return '${error.message} ${error.errors.map((item) => '${item.field}: ${item.message}').join('; ')}';
     }
+    if (error is PhotoPreparationException) return error.message;
     if (error is ApiException) return error.message;
     return 'Please try again.';
   }
 }
 
+class _PublishError extends StatelessWidget {
+  const _PublishError({required this.message});
+
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: PawketColors.danger.withValues(alpha: .08),
+        border: Border.all(color: PawketColors.danger),
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(Icons.cloud_off_outlined, color: PawketColors.danger),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              '$message Your photo and form are still here. Tap Retry publish.',
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _MediaPreview extends StatelessWidget {
-  const _MediaPreview({required this.media, required this.filter});
+  const _MediaPreview({required this.media});
 
   final XFile? media;
-  final PhotoFilter filter;
 
   @override
   Widget build(BuildContext context) {
@@ -280,7 +305,7 @@ class _MediaPreview extends StatelessWidget {
                   if (!snapshot.hasData) {
                     return const Center(child: CircularProgressIndicator());
                   }
-                  return filter.applyTo(
+                  return PawketPhotoFilter.applyTo(
                     Image.memory(
                       Uint8List.fromList(snapshot.data!),
                       fit: BoxFit.cover,

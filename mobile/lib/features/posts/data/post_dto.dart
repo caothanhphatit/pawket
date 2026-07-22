@@ -157,3 +157,24 @@ class CreatePostRequest {
     'visibility': visibility,
   };
 }
+
+class UpdatePostRequest {
+  const UpdatePostRequest({
+    required this.caption,
+    required this.visibility,
+    required this.version,
+  });
+
+  final String? caption;
+  final String visibility;
+  final int version;
+
+  JsonMap toJson() => {
+    'caption': switch (caption?.trim()) {
+      final String value when value.isNotEmpty => value,
+      _ => null,
+    },
+    'visibility': visibility,
+    'version': version,
+  };
+}

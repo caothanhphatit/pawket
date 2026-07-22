@@ -23,6 +23,7 @@ class InvitationDto {
     required this.requestedRole,
     required this.status,
     required this.expiresAt,
+    this.createdAt,
     this.inviterDisplayName,
     this.invitationUrl,
   });
@@ -43,6 +44,10 @@ class InvitationDto {
     ),
     status: json['status'] as String? ?? 'PENDING',
     expiresAt: DateTime.parse(json['expiresAt'] as String).toUtc(),
+    createdAt: switch (json['createdAt']) {
+      final String value => DateTime.parse(value).toUtc(),
+      _ => null,
+    },
     inviterDisplayName:
         json['inviterDisplayName'] as String? ?? json['inviterName'] as String?,
     invitationUrl: switch (json['invitationUrl']) {
@@ -60,6 +65,7 @@ class InvitationDto {
   final PetMemberRole requestedRole;
   final String status;
   final DateTime expiresAt;
+  final DateTime? createdAt;
   final String? inviterDisplayName;
   final Uri? invitationUrl;
 }

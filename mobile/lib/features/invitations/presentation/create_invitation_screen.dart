@@ -114,7 +114,10 @@ class _CreateInvitationScreenState
             ),
             idempotencyKey: const Uuid().v4(),
           );
-      if (mounted) setState(() => _invitation = invitation);
+      if (mounted) {
+        ref.invalidate(pendingInvitationsProvider(widget.petId));
+        setState(() => _invitation = invitation);
+      }
     } catch (_) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

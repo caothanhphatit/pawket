@@ -1,5 +1,6 @@
 package com.pawket.posts;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.pawket.media.MediaDtos.MediaResponse;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
@@ -19,6 +20,11 @@ final class PostDtos {
             @NotEmpty List<UUID> petIds,
             @NotEmpty List<UUID> mediaIds) {}
 
+    record UpdatePostRequest(
+            JsonNode caption,
+            String visibility,
+            @NotNull Long version) {}
+
     record PostResponse(
             UUID id,
             UUID authorId,
@@ -26,6 +32,8 @@ final class PostDtos {
             String visibility,
             Instant capturedAt,
             Instant createdAt,
+            Instant updatedAt,
+            long version,
             List<UUID> petIds,
             List<MediaResponse> media,
             Map<String, Long> reactions,

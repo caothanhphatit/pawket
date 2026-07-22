@@ -4,6 +4,8 @@ import com.pawket.audit.AuditService;
 import com.pawket.invitations.InvitationDtos.InvitationAcceptedResponse;
 import com.pawket.invitations.InvitationDtos.InvitationCreatedResponse;
 import com.pawket.invitations.InvitationDtos.InvitationPreviewResponse;
+import com.pawket.invitations.InvitationDtos.PendingInvitationResponse;
+import com.pawket.shared.error.ApiException;
 import com.pawket.posts.authorization.PetAuthorization;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.persistence.EntityManager;
@@ -19,6 +21,7 @@ import java.time.temporal.ChronoUnit;
 import java.util.Base64;
 import java.util.Locale;
 import java.util.Set;
+import java.util.List;
 import java.util.UUID;
 
 @ApplicationScoped
@@ -56,6 +59,42 @@ public class InvitationService {
         entityManager.persist(invitation);
         auditService.record(actorId, "INVITATION_CREATED", "INVITATION", invitation.id);
         return new InvitationCreatedResponse(invitation.id, token, role, invitation.expiresAt);
+    }
+
+    public List<PendingInvitationResponse> listPending(UUID actorId, UUID petId) {
+        authorization.requireOwner(actorId, petId);
+        return entityManager.createQuery("""
+                        select i from InvitationEntity i
+                        where i.petId = :petId and i.status = 'PENDING' and i.expiresAt > :now
+                        order by i.createdAt desc, i.id desc
+                        """, InvitationEntity.class)
+                .setParameter("petId", petId)
+                .setParameter("now", Instant.now())
+                .getResultList()
+                .stream()
+                .map(invitation -> new PendingInvitationResponse(
+                        invitation.id,
+                        invitation.petId,
+                        invitation.requestedRole,
+                        invitation.status,
+                        invitation.expiresAt,
+                        invitation.createdAt))
+                .toList();
+    }
+
+    @Transactional
+    public void revoke(UUID actorId, UUID invitationId) {
+        var invitation = entityManager.find(InvitationEntity.class, invitationId, LockModeType.PESSIMISTIC_WRITE);
+        if (invitation == null) {
+            throw ApiException.notFound("INVITATION_NOT_FOUND", "Invitation was not found.");
+        }
+        authorization.requireOwner(actorId, invitation.petId);
+        refreshExpiry(invitation);
+        if (!"PENDING".equals(invitation.status)) {
+            throw ApiException.badRequest("INVITATION_NOT_PENDING", "Only a pending invitation can be revoked.");
+        }
+        invitation.status = "REVOKED";
+        auditService.record(actorId, "INVITATION_REVOKED", "INVITATION", invitation.id);
     }
 
     @Transactional

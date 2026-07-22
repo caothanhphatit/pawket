@@ -15,6 +15,8 @@ class CreateUploadIntentRequest {
     required this.mimeType,
     required this.byteSize,
     required this.purpose,
+    this.width,
+    this.height,
     this.checksum,
   });
 
@@ -22,12 +24,16 @@ class CreateUploadIntentRequest {
   final String mimeType;
   final int byteSize;
   final MediaPurpose purpose;
+  final int? width;
+  final int? height;
   final String? checksum;
 
   JsonMap toJson() => {
     'fileName': fileName,
     'mimeType': mimeType,
     'byteSize': byteSize,
+    if (width != null) 'width': width,
+    if (height != null) 'height': height,
     if (checksum != null) 'checksum': checksum,
   };
 }

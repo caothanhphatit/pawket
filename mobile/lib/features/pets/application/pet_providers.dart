@@ -15,11 +15,13 @@ enum PetDataOrigin { remote, localFallback }
 class PetLoadState {
   const PetLoadState({
     this.isLoading = false,
+    this.hasLoaded = false,
     this.origin = PetDataOrigin.remote,
     this.error,
   });
 
   final bool isLoading;
+  final bool hasLoaded;
   final PetDataOrigin origin;
   final Object? error;
 
@@ -33,9 +35,21 @@ final petLoadStateProvider =
 
 class PetLoadStateNotifier extends Notifier<PetLoadState> {
   @override
-  PetLoadState build() => const PetLoadState();
+  PetLoadState build() => const PetLoadState(isLoading: true);
 
   void set(PetLoadState value) => state = value;
+}
+
+final petOnboardingCompletionProvider =
+    NotifierProvider<PetOnboardingCompletionNotifier, bool>(
+      PetOnboardingCompletionNotifier.new,
+    );
+
+class PetOnboardingCompletionNotifier extends Notifier<bool> {
+  @override
+  bool build() => false;
+
+  void setCompleting(bool value) => state = value;
 }
 
 final petsProvider = NotifierProvider<PetsNotifier, List<Pet>>(
@@ -56,14 +70,21 @@ class PetsNotifier extends Notifier<List<Pet>> {
     _requestInFlight = true;
     ref
         .read(petLoadStateProvider.notifier)
-        .set(const PetLoadState(isLoading: true));
+        .set(PetLoadState(isLoading: true, hasLoaded: state.isNotEmpty));
     try {
-      state = await ref.read(petRepositoryProvider).listAccessiblePets();
+      state = await ref
+          .read(petRepositoryProvider)
+          .listAccessiblePets()
+          .timeout(const Duration(seconds: 12));
       ref
           .read(petLoadStateProvider.notifier)
-          .set(const PetLoadState(origin: PetDataOrigin.remote));
+          .set(
+            const PetLoadState(origin: PetDataOrigin.remote, hasLoaded: true),
+          );
     } catch (error) {
-      ref.read(petLoadStateProvider.notifier).set(PetLoadState(error: error));
+      ref
+          .read(petLoadStateProvider.notifier)
+          .set(PetLoadState(error: error, hasLoaded: true));
     } finally {
       _requestInFlight = false;
     }
@@ -83,7 +104,7 @@ class PetsNotifier extends Notifier<List<Pet>> {
     state = [...state, pet];
     ref
         .read(petLoadStateProvider.notifier)
-        .set(const PetLoadState(origin: PetDataOrigin.remote));
+        .set(const PetLoadState(origin: PetDataOrigin.remote, hasLoaded: true));
     return pet;
   }
 

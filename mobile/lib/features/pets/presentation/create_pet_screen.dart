@@ -14,7 +14,9 @@ import 'package:pawket_mobile/features/pets/domain/pet.dart';
 import 'package:pawket_mobile/features/posts/data/post_dto.dart';
 
 class CreatePetScreen extends ConsumerStatefulWidget {
-  const CreatePetScreen({super.key});
+  const CreatePetScreen({this.mandatory = false, super.key});
+
+  final bool mandatory;
 
   @override
   ConsumerState<CreatePetScreen> createState() => _CreatePetScreenState();
@@ -39,93 +41,115 @@ class _CreatePetScreenState extends ConsumerState<CreatePetScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Create a pet')),
-      body: Form(
-        key: formKey,
-        child: ListView(
-          padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
-          children: [
-            _PhotoPicker(
-              photos: selectedPhotos,
-              enabled: !isSubmitting,
-              onPick: _pickPhotos,
-              onRemove: (index) {
-                setState(() => selectedPhotos.removeAt(index));
-              },
-            ),
-            const SizedBox(height: 28),
-            TextFormField(
-              controller: nameController,
-              autofocus: true,
-              textCapitalization: TextCapitalization.words,
-              decoration: const InputDecoration(labelText: 'Name *'),
-              validator: (value) => value == null || value.trim().isEmpty
-                  ? 'Tell us your pet\'s name.'
-                  : null,
-            ),
-            const SizedBox(height: 18),
-            Text('Species *', style: Theme.of(context).textTheme.titleMedium),
-            const SizedBox(height: 10),
-            SegmentedButton<PetSpecies>(
-              segments: const [
-                ButtonSegment(
-                  value: PetSpecies.dog,
-                  icon: Icon(Icons.pets),
-                  label: Text('Dog'),
+    return PopScope(
+      canPop: !widget.mandatory,
+      child: Scaffold(
+        appBar: AppBar(
+          automaticallyImplyLeading: !widget.mandatory,
+          title: Text(widget.mandatory ? 'Your first pet' : 'Create a pet'),
+        ),
+        body: Form(
+          key: formKey,
+          child: ListView(
+            padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
+            children: [
+              if (widget.mandatory) ...[
+                Text(
+                  'Before the first photo, give them a home in Pawket.',
+                  style: Theme.of(context).textTheme.headlineLarge,
                 ),
-                ButtonSegment(
-                  value: PetSpecies.cat,
-                  icon: Icon(Icons.cruelty_free_outlined),
-                  label: Text('Cat'),
+                const SizedBox(height: 8),
+                const Text(
+                  'Name and species are enough. Photos are optional and can be added later.',
+                  style: TextStyle(color: PawketColors.inkMuted, fontSize: 16),
                 ),
+                const SizedBox(height: 28),
               ],
-              selected: {species},
-              onSelectionChanged: (selection) {
-                setState(() => species = selection.single);
-              },
-            ),
-            const SizedBox(height: 18),
-            const ExpansionTile(
-              tilePadding: EdgeInsets.zero,
-              title: Text('Add details later'),
-              subtitle: Text('Birthday, breed, home date and a short bio'),
-              children: [
-                Padding(
-                  padding: EdgeInsets.only(bottom: 16),
-                  child: Text(
-                    'V1 keeps onboarding short. These optional fields will live here.',
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 28),
-            FilledButton(
-              onPressed: isSubmitting ? null : _submit,
-              style: FilledButton.styleFrom(
-                minimumSize: const Size.fromHeight(54),
-                backgroundColor: PawketColors.brand,
+              _PhotoPicker(
+                photos: selectedPhotos,
+                enabled: !isSubmitting,
+                onPick: _pickPhotos,
+                onRemove: (index) {
+                  setState(() => selectedPhotos.removeAt(index));
+                },
               ),
-              child: isSubmitting
-                  ? Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const SizedBox.square(
-                          dimension: 20,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: Colors.white,
+              const SizedBox(height: 28),
+              TextFormField(
+                controller: nameController,
+                autofocus: true,
+                textCapitalization: TextCapitalization.words,
+                decoration: const InputDecoration(labelText: 'Name *'),
+                validator: (value) => value == null || value.trim().isEmpty
+                    ? 'Tell us your pet\'s name.'
+                    : null,
+              ),
+              const SizedBox(height: 18),
+              Text('Species *', style: Theme.of(context).textTheme.titleMedium),
+              const SizedBox(height: 10),
+              SegmentedButton<PetSpecies>(
+                segments: const [
+                  ButtonSegment(
+                    value: PetSpecies.dog,
+                    icon: Icon(Icons.pets),
+                    label: Text('Dog'),
+                  ),
+                  ButtonSegment(
+                    value: PetSpecies.cat,
+                    icon: Icon(Icons.cruelty_free_outlined),
+                    label: Text('Cat'),
+                  ),
+                ],
+                selected: {species},
+                onSelectionChanged: (selection) {
+                  setState(() => species = selection.single);
+                },
+              ),
+              const SizedBox(height: 20),
+              const Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(
+                    Icons.edit_note_outlined,
+                    size: 20,
+                    color: PawketColors.inkMuted,
+                  ),
+                  SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Birthday, breed, home date and bio can be added later from Profile.',
+                      style: TextStyle(color: PawketColors.inkMuted),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 28),
+              FilledButton(
+                onPressed: isSubmitting ? null : _submit,
+                style: FilledButton.styleFrom(
+                  minimumSize: const Size.fromHeight(54),
+                  backgroundColor: PawketColors.brand,
+                ),
+                child: isSubmitting
+                    ? Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const SizedBox.square(
+                            dimension: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
                           ),
-                        ),
-                        const SizedBox(width: 10),
-                        Flexible(
-                          child: Text(submissionStatus ?? 'Creating...'),
-                        ),
-                      ],
-                    )
-                  : const Text('Create profile'),
-            ),
-          ],
+                          const SizedBox(width: 10),
+                          Flexible(
+                            child: Text(submissionStatus ?? 'Creating...'),
+                          ),
+                        ],
+                      )
+                    : const Text('Create profile'),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -151,6 +175,9 @@ class _CreatePetScreenState extends ConsumerState<CreatePetScreen> {
 
   Future<void> _submit() async {
     if (!formKey.currentState!.validate()) return;
+    if (widget.mandatory) {
+      ref.read(petOnboardingCompletionProvider.notifier).setCompleting(true);
+    }
     setState(() {
       isSubmitting = true;
       submissionStatus = 'Creating profile...';
@@ -209,9 +236,16 @@ class _CreatePetScreenState extends ConsumerState<CreatePetScreen> {
         );
       }
       if (!mounted) return;
-      Navigator.pop(context);
+      if (widget.mandatory) {
+        ref.read(petOnboardingCompletionProvider.notifier).setCompleting(false);
+      } else {
+        Navigator.pop(context);
+      }
     } catch (error) {
       if (!mounted) return;
+      if (widget.mandatory) {
+        ref.read(petOnboardingCompletionProvider.notifier).setCompleting(false);
+      }
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Could not create profile: $error')),
       );

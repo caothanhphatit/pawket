@@ -6,6 +6,8 @@ import '../../../app/theme/pawket_theme.dart';
 import '../../../app/widgets/pawket_scaffold.dart';
 import '../../feed/application/feed_providers.dart';
 import '../../memberships/application/membership_providers.dart';
+import '../../milestones/application/milestone_providers.dart';
+import '../../milestones/presentation/milestone_section.dart';
 import '../../posts/data/post_dto.dart';
 import '../application/pet_providers.dart';
 import '../data/pet_dto.dart';
@@ -56,6 +58,7 @@ class _ProfileContent extends ConsumerWidget {
         ref.invalidate(petDetailsProvider(pet.id));
         ref.invalidate(petMemoriesProvider(pet.id));
         ref.invalidate(petMembersProvider(pet.id));
+        ref.invalidate(petMilestonesProvider(pet.id));
         await ref.read(petsProvider.notifier).refresh();
       },
       child: CustomScrollView(
@@ -80,6 +83,10 @@ class _ProfileContent extends ConsumerWidget {
                 ],
               ),
             ),
+          ),
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(20, 28, 20, 0),
+            sliver: SliverToBoxAdapter(child: MilestoneSection(petId: pet.id)),
           ),
           SliverPadding(
             padding: const EdgeInsets.fromLTRB(20, 24, 20, 0),
@@ -245,6 +252,12 @@ class _ProfileContent extends ConsumerWidget {
                     memories.isLoading ? '…' : '${posts.length}',
                     style: const TextStyle(color: PawketColors.inkMuted),
                   ),
+                  const Spacer(),
+                  IconButton(
+                    onPressed: () => _showMemoryTools(context),
+                    tooltip: 'Memory tools',
+                    icon: const Icon(Icons.more_horiz),
+                  ),
                 ],
               ),
             ),
@@ -344,6 +357,52 @@ class _ProfileContent extends ConsumerWidget {
           ),
         );
       },
+    );
+  }
+
+  Future<void> _showMemoryTools(BuildContext context) {
+    return showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (sheetContext) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(12, 0, 12, 18),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                leading: const Icon(Icons.calendar_month_outlined),
+                title: const Text('Memory calendar'),
+                subtitle: const Text('Browse the days you remembered'),
+                onTap: () {
+                  Navigator.pop(sheetContext);
+                  context.push('/calendar');
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.auto_awesome_outlined),
+                title: const Text('Weekly recap'),
+                subtitle: const Text('Create and share the last seven days'),
+                onTap: () {
+                  Navigator.pop(sheetContext);
+                  context.push('/recap');
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.add_photo_alternate_outlined),
+                title: const Text('Add old memories'),
+                subtitle: const Text(
+                  'Import photos without changing the camera',
+                ),
+                onTap: () {
+                  Navigator.pop(sheetContext);
+                  context.push('/memories/import');
+                },
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

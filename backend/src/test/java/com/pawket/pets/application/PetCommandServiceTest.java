@@ -141,5 +141,8 @@ class PetCommandServiceTest {
 
         @Override
         public void remove(UUID membershipId, Instant removedAt) {}
+
+        @Override
+        public void updateRole(UUID membershipId, MembershipRole role) {}
     }
 }

@@ -121,6 +121,58 @@ class MembershipResourceTest {
                 .body("code", equalTo("OWNER_REMOVAL_NOT_ALLOWED"));
     }
 
+    @Test
+    void ownerCanChangeANonOwnerRole() throws Exception {
+        var petId = createPet();
+        var membershipId = addMember(petId, OTHER_USER_ID, "FOLLOWER");
+
+        given()
+                .contentType(ContentType.JSON)
+                .body("{\"role\":\"CARETAKER\"}")
+                .when().patch("/api/v1/pets/{petId}/members/{userId}", petId, OTHER_USER_ID)
+                .then()
+                .statusCode(204);
+
+        given()
+                .when().get("/api/v1/pets/{petId}/members", petId)
+                .then()
+                .statusCode(200)
+                .body("data.find { it.userId == '%s' }.role".formatted(OTHER_USER_ID), equalTo("CARETAKER"));
+
+        inTransaction(() -> {
+            var audits = (Number) entityManager.createNativeQuery("""
+                            select count(*) from audit_events
+                            where action = 'PET_MEMBER_ROLE_UPDATED' and resource_id = :id
+                            """, Long.class)
+                    .setParameter("id", membershipId)
+                    .getSingleResult();
+            org.junit.jupiter.api.Assertions.assertEquals(1L, audits.longValue());
+        });
+    }
+
+    @Test
+    void caretakerCannotChangeRolesAndOwnerRoleCannotBeGranted() throws Exception {
+        var petId = createPet();
+        addMember(petId, OTHER_USER_ID, "CARETAKER");
+
+        given()
+                .header("X-User-Id", OTHER_USER_ID)
+                .contentType(ContentType.JSON)
+                .body("{\"role\":\"FOLLOWER\"}")
+                .when().patch("/api/v1/pets/{petId}/members/{userId}", petId, OTHER_USER_ID)
+                .then()
+                .statusCode(403)
+                .body("code", equalTo("MEMBER_ROLE_UPDATE_FORBIDDEN"));
+
+        given()
+                .contentType(ContentType.JSON)
+                .body("{\"role\":\"OWNER\"}")
+                .when().patch("/api/v1/pets/{petId}/members/{userId}", petId, OTHER_USER_ID)
+                .then()
+                .statusCode(400)
+                .body("code", equalTo("OWNER_ROLE_CHANGE_NOT_ALLOWED"));
+    }
+
     private UUID createPet() {
         var petId = UUID.fromString(given()
                 .contentType(ContentType.JSON)

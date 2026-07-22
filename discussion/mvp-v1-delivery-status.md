@@ -1,21 +1,22 @@
 # Pawket MVP V1 Delivery Status
 
-Updated: 2026-07-21
+Updated: 2026-07-22
 
 ## Frozen scope
 
 - Camera-first launch with a square preview, shutter, flash and lens switch.
 - Camera to Home uses vertical motion; Feed and Profile use horizontal motion.
 - One current pet at a time. Multiple pets are switched from Profile.
-- Pet creation requires name and species; 0-5 starter photos are optional.
+- First launch requires a pet profile before the camera is available; name and species are required and 0-5 starter photos are optional.
 - The first starter photo becomes the pet avatar and every starter photo becomes a memory.
-- A memory can tag one or more accessible pets and may have no caption.
+- A new memory is always saved to the current pet and may have no caption. Pet switching only lives in Profile.
 - Audience supports `PET_MEMBERS` and `PRIVATE`.
 - Feed, newest-first profile album, memory detail and reactions.
-- Profile editing, member list, invitation links and owner-controlled member removal.
+- Memory edit/delete, daily local reminder, monthly calendar, weekly recap sharing and old-photo import from Profile.
+- Profile editing, milestones, member roles, pending invitation management and owner-controlled member removal.
 
 Explicitly deferred: AI identification, marketplace, ownership transfer, public discovery,
-chat, video, friends graph, push notifications and medical records.
+chat, video, friends graph, remote push notifications and medical records.
 
 ## Implemented mobile slices
 
@@ -26,6 +27,11 @@ chat, video, friends graph, push notifications and medical records.
 - Real pet avatars from media, real current-account data and no fabricated offline pets/posts.
 - Feed/profile refresh, cursor page aggregation, memory detail zoom and reactions.
 - Members, invitations and owner member removal.
+- Mandatory first-pet gate with bounded loading, connection retry and no skip path.
+- Daily status, configurable on-device reminder, monthly calendar and shareable weekly recap.
+- Old-photo import is available from Profile without adding a gallery action to the camera.
+- Memory caption/audience editing, deletion, bounded resize/compression and resumable publish retries.
+- Birthday, home day, first trip and custom milestones.
 
 ## Implemented backend slices
 
@@ -37,6 +43,9 @@ chat, video, friends graph, push notifications and medical records.
 - Stable problem responses for validation and HTTP errors with correlation IDs.
 - Optimistic pet profile version checks.
 - Atomic media attachment and locked invitation acceptance.
+- Memory edit/delete with author authorization, version checks and inaccessible deleted media.
+- Media limits plus scheduled cleanup/purge for abandoned uploads.
+- Member role changes, pending invitation listing/revocation and milestone authorization/audit.
 
 ## External setup before public beta
 
@@ -45,8 +54,9 @@ These are deployment decisions, not missing local MVP code:
 - Select and configure the managed OIDC provider and mobile sign-in UX.
 - Configure production PostgreSQL, object storage/CDN, secrets and backups.
 - Configure the `pawket.app` domain plus iOS Universal Links and Android App Links.
-- Add privacy policy, account deletion/export and App Store/Play Store metadata.
+- Add privacy policy, account deletion decisions and App Store/Play Store metadata. Portable JSON export is implemented.
 - Add CI, crash reporting, metrics/alerts and a staged distribution pipeline.
 
-Until OIDC is configured, local iPhone builds use `PAWKET_DEV_USER_ID` and must point to the
-LAN backend URL supplied through `PAWKET_API_BASE_URL`.
+Until OIDC is configured, private-beta iPhone builds use `PAWKET_DEV_USER_ID`. The current
+default API is `https://v2.poeviethoa.net/api/v1`; local development should override it with
+`PAWKET_API_BASE_URL`.

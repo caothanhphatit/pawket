@@ -7,7 +7,9 @@ import com.pawket.posts.PostDtos.CreatePostRequest;
 import com.pawket.posts.PostDtos.PostPage;
 import com.pawket.posts.PostDtos.PageMeta;
 import com.pawket.posts.PostDtos.PostResponse;
+import com.pawket.posts.PostDtos.UpdatePostRequest;
 import com.pawket.posts.authorization.PetAuthorization;
+import com.pawket.shared.error.ApiException;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.persistence.EntityManager;
 import jakarta.transaction.Transactional;
@@ -71,7 +73,7 @@ public class PostService {
         var readyMedia = (Number) entityManager.createNativeQuery("""
                         select count(*) from media
                         where id in (:mediaIds) and owner_user_id = :actorId
-                          and status = 'READY' and post_id is null
+                          and media_type = 'IMAGE' and status = 'READY' and post_id is null
                         """, Long.class)
                 .setParameter("mediaIds", mediaIds)
                 .setParameter("actorId", actorId)
@@ -95,7 +97,7 @@ public class PostService {
         var attachedMedia = entityManager.createNativeQuery("""
                         update media set post_id = :postId
                         where id in (:mediaIds) and owner_user_id = :actorId
-                          and status = 'READY' and post_id is null
+                          and media_type = 'IMAGE' and status = 'READY' and post_id is null
                         """)
                 .setParameter("postId", post.id)
                 .setParameter("mediaIds", mediaIds)
@@ -110,10 +112,70 @@ public class PostService {
     }
 
     public PostResponse get(UUID actorId, UUID postId) {
-        authorization.requirePostAccess(actorId, postId);
         var post = entityManager.find(PostEntity.class, postId);
         if (post == null || !"PUBLISHED".equals(post.status)) throw new NotFoundException("Post not found");
+        authorization.requirePostAccess(actorId, postId);
         return toResponse(actorId, post);
+    }
+
+    @Transactional
+    public PostResponse update(UUID actorId, UUID postId, UpdatePostRequest request) {
+        var post = requireAuthor(actorId, postId);
+        if (request.version() != post.version) {
+            throw ApiException.conflict("POST_VERSION_CONFLICT", "The memory was changed by another request.");
+        }
+
+        var caption = request.caption() == null ? post.caption : normalizeCaptionNode(request.caption());
+        var visibility = request.visibility() == null
+                ? post.visibility
+                : request.visibility().toUpperCase(Locale.ROOT);
+        if (!VISIBILITIES.contains(visibility)) throw new BadRequestException("Invalid post visibility");
+        if (java.util.Objects.equals(caption, post.caption) && visibility.equals(post.visibility)) {
+            return toResponse(actorId, post);
+        }
+
+        var now = Instant.now();
+        var updated = entityManager.createNativeQuery("""
+                        update posts
+                        set caption = :caption, visibility = :visibility, updated_at = :now, version = version + 1
+                        where id = :postId and author_id = :actorId
+                          and status = 'PUBLISHED' and version = :version
+                        """)
+                .setParameter("caption", caption)
+                .setParameter("visibility", visibility)
+                .setParameter("now", now)
+                .setParameter("postId", postId)
+                .setParameter("actorId", actorId)
+                .setParameter("version", request.version())
+                .executeUpdate();
+        if (updated != 1) {
+            throw ApiException.conflict("POST_VERSION_CONFLICT", "The memory was changed by another request.");
+        }
+        auditService.record(actorId, "POST_UPDATED", "POST", postId);
+        entityManager.clear();
+        return toResponse(actorId, entityManager.find(PostEntity.class, postId));
+    }
+
+    @Transactional
+    public void delete(UUID actorId, UUID postId) {
+        var post = entityManager.find(PostEntity.class, postId);
+        if (post == null) throw new NotFoundException("Post not found");
+        if (!post.authorId.equals(actorId)) throw ApiException.forbidden("POST_DELETE_FORBIDDEN", "Only the author can delete this memory.");
+        if ("DELETED".equals(post.status)) return;
+        if (!"PUBLISHED".equals(post.status)) throw new NotFoundException("Post not found");
+
+        var now = Instant.now();
+        post.status = "DELETED";
+        post.updatedAt = now;
+        entityManager.createNativeQuery("""
+                        update media set status = 'DELETED', deleted_at = :now
+                        where post_id = :postId and status <> 'DELETED'
+                        """)
+                .setParameter("now", now)
+                .setParameter("postId", postId)
+                .executeUpdate();
+        auditService.record(actorId, "POST_DELETED", "POST", postId);
+        entityManager.flush();
     }
 
     public PostPage feed(UUID actorId, UUID petId, String cursor, int requestedLimit) {
@@ -191,7 +253,24 @@ public class PostService {
                 .getResultList();
         var mine = myReactionRows.isEmpty() ? null : (String) myReactionRows.getFirst();
         return new PostResponse(post.id, post.authorId, post.caption, post.visibility, post.capturedAt,
-                post.createdAt, petIds, media, reactions, mine);
+                post.createdAt, post.updatedAt, post.version, petIds, media, reactions, mine);
+    }
+
+    private PostEntity requireAuthor(UUID actorId, UUID postId) {
+        var post = entityManager.find(PostEntity.class, postId);
+        if (post == null || !"PUBLISHED".equals(post.status)) throw new NotFoundException("Post not found");
+        if (!post.authorId.equals(actorId)) {
+            throw ApiException.forbidden("POST_UPDATE_FORBIDDEN", "Only the author can edit this memory.");
+        }
+        return post;
+    }
+
+    private static String normalizeCaptionNode(com.fasterxml.jackson.databind.JsonNode caption) {
+        if (caption.isNull()) return null;
+        if (!caption.isTextual()) throw new BadRequestException("caption must be a string or null");
+        var value = normalizeCaption(caption.textValue());
+        if (value != null && value.length() > 2000) throw new BadRequestException("caption is too long");
+        return value;
     }
 
     private static String normalizeCaption(String caption) {

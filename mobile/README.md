@@ -4,15 +4,16 @@ Flutter client for Pawket, targeting web, iOS, and Android. The app starts on th
 
 ## Implemented MVP
 
-- Camera and photo-library selection with a memory composer.
+- Square camera capture with flash/lens controls, one subtle default photo polish, and a reliable memory composer.
 - One owner with multiple pet profiles and a persisted active-pet selection.
 - Pet creation with zero to five optional first memories, live profile editing, and Profile-based pet switching.
 - Feed, Home highlights, and newest-first per-pet memory grid.
 - Remote pet, media, post, feed/timeline, reaction, membership, and invitation data layers.
-- Pet members, invitation creation/acceptance, reactions, loading/error states, and an offline pet fallback.
+- Memory edit/delete, monthly calendar, weekly recap sharing, Profile-only old-photo import, milestones, and daily local reminders.
+- Pet members, role management, pending invitation revoke, reactions, and honest loading/error states without fabricated offline data.
 - Riverpod dependency injection/state management, GoRouter navigation, and Dio networking.
 
-AI identification, marketplace/payment flows, ownership transfer, notifications, and production authentication are outside the current MVP.
+AI identification, marketplace/payment flows, ownership transfer, remote push notifications, and production authentication are outside the current MVP.
 
 ## Toolchain
 
@@ -50,7 +51,7 @@ flutter run -d chrome --web-port 4173 \
   --dart-define=PAWKET_DEV_USER_ID=00000000-0000-0000-0000-000000000001
 ```
 
-The fixed port is required by the backend's local CORS allowlist. The API URL defaults to `http://localhost:8080/api/v1`, but keeping the define explicit makes the selected environment clear.
+The fixed port is required by the backend's local CORS allowlist. The application default is `https://v2.poeviethoa.net/api/v1`; use the explicit define above to target a local backend.
 
 `PAWKET_DEV_USER_ID` sends the development-only `X-User-Id` header. Omit it to let the backend use its configured default development user. Production builds must use the OIDC token integration instead.
 

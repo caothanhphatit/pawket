@@ -88,7 +88,9 @@ class HomeScreen extends ConsumerWidget {
                                     ),
                                   ),
                                   Text(
-                                    memories?.value?.items.isNotEmpty == true
+                                    _hasMemoryToday(
+                                          memories?.value?.items ?? const [],
+                                        )
                                         ? 'Remembered'
                                         : 'Ready today',
                                     maxLines: 1,
@@ -360,4 +362,14 @@ String _dateLabel(DateTime value) {
   ];
   final local = value.toLocal();
   return '${local.day} ${months[local.month - 1]}';
+}
+
+bool _hasMemoryToday(List<PostDto> posts) {
+  final now = DateTime.now();
+  return posts.any((post) {
+    final local = post.capturedAt.toLocal();
+    return local.year == now.year &&
+        local.month == now.month &&
+        local.day == now.day;
+  });
 }

@@ -14,6 +14,14 @@ final class InvitationDtos {
 
     record InvitationCreatedResponse(UUID id, String token, String role, Instant expiresAt) {}
 
+    record PendingInvitationResponse(
+            UUID id,
+            UUID petId,
+            String requestedRole,
+            String status,
+            Instant expiresAt,
+            Instant createdAt) {}
+
     record InvitationPreviewResponse(
             UUID id,
             UUID petId,

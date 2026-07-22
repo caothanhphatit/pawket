@@ -5,6 +5,7 @@ import 'member_dto.dart';
 abstract interface class MembershipRepository {
   Future<List<MemberDto>> listMembers(String petId);
   Future<void> removeMember(String petId, String userId);
+  Future<void> updateMemberRole(String petId, String userId, String role);
 }
 
 class RemoteMembershipRepository implements MembershipRepository {
@@ -24,5 +25,17 @@ class RemoteMembershipRepository implements MembershipRepository {
   @override
   Future<void> removeMember(String petId, String userId) async {
     await _apiClient.delete<void>('/pets/$petId/members/$userId');
+  }
+
+  @override
+  Future<void> updateMemberRole(
+    String petId,
+    String userId,
+    String role,
+  ) async {
+    await _apiClient.patch<void>(
+      '/pets/$petId/members/$userId',
+      data: {'role': role},
+    );
   }
 }

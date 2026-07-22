@@ -4,6 +4,8 @@ import 'package:go_router/go_router.dart';
 
 import '../../../app/theme/pawket_theme.dart';
 import '../../pets/application/pet_providers.dart';
+import '../../invitations/application/invitation_providers.dart';
+import '../../invitations/data/invitation_dto.dart';
 import '../application/membership_providers.dart';
 import '../data/member_dto.dart';
 
@@ -17,7 +19,8 @@ class MembersScreen extends ConsumerStatefulWidget {
 }
 
 class _MembersScreenState extends ConsumerState<MembersScreen> {
-  final Set<String> _removingUserIds = {};
+  final Set<String> _busyMemberIds = {};
+  final Set<String> _revokingInvitationIds = {};
 
   @override
   Widget build(BuildContext context) {
@@ -49,6 +52,9 @@ class _MembersScreenState extends ConsumerState<MembersScreen> {
                 (member) =>
                     member.userId == currentUserId && member.role == 'OWNER',
               );
+              final pendingInvitations = canManageMembers
+                  ? ref.watch(pendingInvitationsProvider(petId))
+                  : null;
               return RefreshIndicator(
                 onRefresh: () => ref.refresh(petMembersProvider(petId).future),
                 child: ListView(
@@ -87,9 +93,11 @@ class _MembersScreenState extends ConsumerState<MembersScreen> {
                                 canRemove:
                                     canManageMembers &&
                                     items[index].role != 'OWNER',
-                                isRemoving: _removingUserIds.contains(
+                                isBusy: _busyMemberIds.contains(
                                   items[index].userId,
                                 ),
+                                onRoleChanged: (role) =>
+                                    _changeRole(items[index], role),
                                 onRemove: () => _confirmRemove(items[index]),
                               ),
                               if (index != items.length - 1)
@@ -99,12 +107,22 @@ class _MembersScreenState extends ConsumerState<MembersScreen> {
                         ),
                       ),
                     const SizedBox(height: 20),
-                    if (canManageMembers)
+                    if (canManageMembers) ...[
+                      _PendingInvitations(
+                        invitations: pendingInvitations!,
+                        revokingIds: _revokingInvitationIds,
+                        onRevoke: _confirmRevokeInvitation,
+                        onRetry: () => ref.invalidate(
+                          pendingInvitationsProvider(widget.petId),
+                        ),
+                      ),
+                      const SizedBox(height: 20),
                       FilledButton.icon(
                         onPressed: () => context.push('/pets/$petId/invite'),
                         icon: const Icon(Icons.link),
                         label: const Text('Create invite link'),
                       ),
+                    ],
                   ],
                 ),
               );
@@ -138,7 +156,7 @@ class _MembersScreenState extends ConsumerState<MembersScreen> {
     );
     if (confirmed != true || !mounted) return;
 
-    setState(() => _removingUserIds.add(member.userId));
+    setState(() => _busyMemberIds.add(member.userId));
     try {
       await ref
           .read(membershipRepositoryProvider)
@@ -152,7 +170,68 @@ class _MembersScreenState extends ConsumerState<MembersScreen> {
       }
     } finally {
       if (mounted) {
-        setState(() => _removingUserIds.remove(member.userId));
+        setState(() => _busyMemberIds.remove(member.userId));
+      }
+    }
+  }
+
+  Future<void> _changeRole(MemberDto member, String role) async {
+    if (member.role == role || _busyMemberIds.contains(member.userId)) return;
+    setState(() => _busyMemberIds.add(member.userId));
+    try {
+      await ref
+          .read(membershipRepositoryProvider)
+          .updateMemberRole(widget.petId, member.userId, role);
+      ref.invalidate(petMembersProvider(widget.petId));
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Could not change this member role.')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _busyMemberIds.remove(member.userId));
+    }
+  }
+
+  Future<void> _confirmRevokeInvitation(InvitationDto invitation) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Revoke invite link?'),
+        content: const Text(
+          'Anyone who has this link will no longer be able to join with it.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Keep link'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: FilledButton.styleFrom(backgroundColor: PawketColors.danger),
+            child: const Text('Revoke'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    setState(() => _revokingInvitationIds.add(invitation.id));
+    try {
+      await ref
+          .read(invitationRepositoryProvider)
+          .revokeInvitation(invitation.id);
+      ref.invalidate(pendingInvitationsProvider(widget.petId));
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Could not revoke this invite.')),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _revokingInvitationIds.remove(invitation.id));
       }
     }
   }
@@ -162,13 +241,15 @@ class _MemberTile extends StatelessWidget {
   const _MemberTile({
     required this.member,
     required this.canRemove,
-    required this.isRemoving,
+    required this.isBusy,
+    required this.onRoleChanged,
     required this.onRemove,
   });
 
   final MemberDto member;
   final bool canRemove;
-  final bool isRemoving;
+  final bool isBusy;
+  final ValueChanged<String> onRoleChanged;
   final VoidCallback onRemove;
 
   @override
@@ -194,7 +275,7 @@ class _MemberTile extends StatelessWidget {
           _RoleBadge(role: member.role),
           if (canRemove) ...[
             const SizedBox(width: 4),
-            if (isRemoving)
+            if (isBusy)
               const Padding(
                 padding: EdgeInsets.all(12),
                 child: SizedBox.square(
@@ -203,10 +284,35 @@ class _MemberTile extends StatelessWidget {
                 ),
               )
             else
-              IconButton(
-                tooltip: 'Remove ${member.displayName}',
-                onPressed: onRemove,
-                icon: const Icon(Icons.person_remove_outlined),
+              PopupMenuButton<String>(
+                tooltip: 'Manage ${member.displayName}',
+                onSelected: (value) {
+                  if (value == 'REMOVE') {
+                    onRemove();
+                  } else {
+                    onRoleChanged(value);
+                  }
+                },
+                itemBuilder: (context) => [
+                  PopupMenuItem(
+                    value: 'CARETAKER',
+                    enabled: member.role != 'CARETAKER',
+                    child: const Text('Make caretaker'),
+                  ),
+                  PopupMenuItem(
+                    value: 'FOLLOWER',
+                    enabled: member.role != 'FOLLOWER',
+                    child: const Text('Make follower'),
+                  ),
+                  const PopupMenuDivider(),
+                  const PopupMenuItem(
+                    value: 'REMOVE',
+                    child: Text(
+                      'Remove member',
+                      style: TextStyle(color: PawketColors.danger),
+                    ),
+                  ),
+                ],
               ),
           ],
         ],
@@ -245,6 +351,99 @@ class _RoleBadge extends StatelessWidget {
         style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
       ),
     );
+  }
+}
+
+class _PendingInvitations extends StatelessWidget {
+  const _PendingInvitations({
+    required this.invitations,
+    required this.revokingIds,
+    required this.onRevoke,
+    required this.onRetry,
+  });
+
+  final AsyncValue<List<InvitationDto>> invitations;
+  final Set<String> revokingIds;
+  final ValueChanged<InvitationDto> onRevoke;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('PENDING INVITES', style: Theme.of(context).textTheme.labelLarge),
+        const SizedBox(height: 10),
+        invitations.when(
+          loading: () => const Card(
+            child: Padding(
+              padding: EdgeInsets.all(20),
+              child: Center(child: CircularProgressIndicator()),
+            ),
+          ),
+          error: (_, _) => Card(
+            child: ListTile(
+              leading: const Icon(Icons.link_off_outlined),
+              title: const Text('Could not load pending invites'),
+              trailing: TextButton(
+                onPressed: onRetry,
+                child: const Text('Retry'),
+              ),
+            ),
+          ),
+          data: (items) {
+            if (items.isEmpty) {
+              return const Card(
+                child: ListTile(
+                  leading: Icon(Icons.link_outlined),
+                  title: Text('No pending invite links'),
+                  subtitle: Text(
+                    'New links will appear here until used or revoked.',
+                  ),
+                ),
+              );
+            }
+            return Card(
+              child: Column(
+                children: [
+                  for (var index = 0; index < items.length; index++) ...[
+                    ListTile(
+                      leading: const Icon(Icons.link_outlined),
+                      title: Text(_invitationRole(items[index].requestedRole)),
+                      subtitle: Text(
+                        'Expires ${_friendlyDate(items[index].expiresAt)}',
+                      ),
+                      trailing: revokingIds.contains(items[index].id)
+                          ? const SizedBox.square(
+                              dimension: 20,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : IconButton(
+                              tooltip: 'Revoke invite',
+                              onPressed: () => onRevoke(items[index]),
+                              icon: const Icon(Icons.link_off_outlined),
+                            ),
+                    ),
+                    if (index != items.length - 1) const Divider(height: 1),
+                  ],
+                ],
+              ),
+            );
+          },
+        ),
+      ],
+    );
+  }
+
+  static String _invitationRole(PetMemberRole role) => switch (role) {
+    PetMemberRole.caretaker => 'Caretaker invite',
+    PetMemberRole.follower => 'Follower invite',
+    PetMemberRole.owner => 'Owner invite',
+  };
+
+  static String _friendlyDate(DateTime value) {
+    final local = value.toLocal();
+    return '${local.day}/${local.month}/${local.year}';
   }
 }
 

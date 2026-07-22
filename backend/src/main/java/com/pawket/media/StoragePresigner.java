@@ -12,6 +12,8 @@ import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 import software.amazon.awssdk.services.s3.model.GetObjectRequest;
 import software.amazon.awssdk.services.s3.model.HeadObjectRequest;
+import software.amazon.awssdk.services.s3.model.HeadBucketRequest;
+import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
 import software.amazon.awssdk.services.s3.model.S3Exception;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.S3Configuration;
@@ -82,6 +84,18 @@ class StoragePresigner {
         } catch (S3Exception exception) {
             if (exception.statusCode() == 404) return null;
             throw exception;
+        }
+    }
+
+    void checkBucket() {
+        client.headBucket(HeadBucketRequest.builder().bucket(bucket).build());
+    }
+
+    void delete(String storageKey) {
+        try {
+            client.deleteObject(DeleteObjectRequest.builder().bucket(bucket).key(storageKey).build());
+        } catch (S3Exception exception) {
+            if (exception.statusCode() != 404) throw exception;
         }
     }
 

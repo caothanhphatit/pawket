@@ -51,6 +51,7 @@ The backend listens on `http://localhost:8080`. Flyway runs `src/main/resources/
 Useful development endpoints:
 
 - Health: `http://localhost:8080/q/health`
+- Readiness: `http://localhost:8080/q/health/ready` (checks PostgreSQL and the private object-storage bucket).
 - OpenAPI: `http://localhost:8080/q/openapi`
 - Swagger UI: `http://localhost:8080/q/swagger-ui`
 - Quarkus Dev UI: `http://localhost:8080/q/dev/`
@@ -70,6 +71,7 @@ Set another development identity with the `X-User-Id` request header or the `DEV
 All application endpoints are under `/api/v1`:
 
 - Current user: `GET /users/me`.
+- Portable user export: authenticated `GET /users/me/export`. The JSON export contains the current user, accessible pet profiles and memberships, authored memories with pet/media metadata, and reactions created by the user. It intentionally excludes signed URLs, storage keys, invitation tokens, identity-provider claims, and credentials.
 - Pets: list, create, read, update, and list members.
 - Media: create a signed upload intent, upload directly to private S3-compatible storage, complete/verify the upload, and authorize content access.
 - Memories: create/read posts, retrieve a cursor-paginated feed, and retrieve each pet's cursor-paginated timeline.
@@ -94,6 +96,8 @@ Defaults are defined in `src/main/resources/application.properties` and can be o
 | `S3_BUCKET` | `pawket-media` | Private media bucket |
 | `S3_ACCESS_KEY` / `S3_SECRET_KEY` | local MinIO credentials | Storage credentials |
 | `S3_UPLOAD_TTL` | `10M` | Signed upload lifetime |
+
+User exports are bounded to 500 accessible pets, 10,000 authored memories, 20,000 media records, 50,000 pet tags, and 20,000 reactions per request. Larger accounts receive `EXPORT_TOO_LARGE` instead of a partial export.
 
 The local web CORS allowlist contains `http://127.0.0.1:4173` and `http://localhost:4173`.
 

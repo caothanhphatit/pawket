@@ -1,137 +1,117 @@
-import 'dart:async';
-import 'dart:typed_data';
-import 'dart:ui' as ui;
-
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:image/image.dart' as image;
 
-enum PhotoFilter {
-  original('Original', _identity),
-  warm('Warm', _warm),
-  film('Film', _film),
-  mono('B&W', _mono);
+abstract final class PawketPhotoFilter {
+  static const maxInputBytes = 25 * 1024 * 1024;
+  static const maxOutputDimension = 2048;
 
-  const PhotoFilter(this.label, this.matrix);
+  static const _previewMatrix = <double>[
+    1.035,
+    0.005,
+    0,
+    0,
+    -2,
+    0.005,
+    1.025,
+    0,
+    0,
+    -2,
+    0,
+    0.005,
+    1.0,
+    0,
+    -3,
+    0,
+    0,
+    0,
+    1,
+    0,
+  ];
 
-  final String label;
-  final List<double> matrix;
-
-  bool get changesImage => this != PhotoFilter.original;
-
-  Widget applyTo(Widget child) {
-    return changesImage
-        ? ColorFiltered(colorFilter: ColorFilter.matrix(matrix), child: child)
-        : child;
+  static Widget applyTo(Widget child) {
+    return ColorFiltered(
+      colorFilter: const ColorFilter.matrix(_previewMatrix),
+      child: child,
+    );
   }
 
-  Future<Uint8List> applyToBytes(Uint8List bytes) async {
-    if (!changesImage) return bytes;
+  static Future<PreparedPhoto> prepareForUpload(Uint8List bytes) async {
+    if (bytes.length > maxInputBytes) {
+      throw const PhotoPreparationException(
+        'This photo is too large. Please take another photo.',
+      );
+    }
+    final result = await compute(_preparePhoto, bytes);
+    if (result == null) {
+      throw const PhotoPreparationException(
+        'Pawket could not read this photo. Please take another photo.',
+      );
+    }
+    return PreparedPhoto(bytes: result.$1, width: result.$2, height: result.$3);
+  }
 
-    final completer = Completer<ui.Image>();
-    ui.decodeImageFromList(bytes, completer.complete);
-    final source = await completer.future;
-    final recorder = ui.PictureRecorder();
-    final canvas = Canvas(recorder);
-    final paint = Paint()..colorFilter = ColorFilter.matrix(matrix);
-    canvas.drawImage(source, Offset.zero, paint);
-    final picture = recorder.endRecording();
-    final filtered = await picture.toImage(source.width, source.height);
-    final data = await filtered.toByteData(format: ui.ImageByteFormat.png);
-    source.dispose();
-    filtered.dispose();
-    picture.dispose();
-    if (data == null) throw StateError('Could not encode the filtered photo.');
-    return data.buffer.asUint8List();
+  static Future<Uint8List?> applyToBytes(Uint8List bytes) async {
+    try {
+      return (await prepareForUpload(bytes)).bytes;
+    } on PhotoPreparationException {
+      return null;
+    }
   }
 }
 
-const _identity = <double>[
-  1,
-  0,
-  0,
-  0,
-  0,
-  0,
-  1,
-  0,
-  0,
-  0,
-  0,
-  0,
-  1,
-  0,
-  0,
-  0,
-  0,
-  0,
-  1,
-  0,
-];
+class PreparedPhoto {
+  const PreparedPhoto({
+    required this.bytes,
+    required this.width,
+    required this.height,
+  });
 
-const _warm = <double>[
-  1.08,
-  0.02,
-  0,
-  0,
-  7,
-  0.01,
-  1.02,
-  0,
-  0,
-  3,
-  0,
-  0.01,
-  0.90,
-  0,
-  -3,
-  0,
-  0,
-  0,
-  1,
-  0,
-];
+  final Uint8List bytes;
+  final int width;
+  final int height;
+}
 
-const _film = <double>[
-  0.93,
-  0.05,
-  0.02,
-  0,
-  7,
-  0.03,
-  0.93,
-  0.04,
-  0,
-  5,
-  0.02,
-  0.08,
-  0.84,
-  0,
-  5,
-  0,
-  0,
-  0,
-  1,
-  0,
-];
+class PhotoPreparationException implements Exception {
+  const PhotoPreparationException(this.message);
 
-const _mono = <double>[
-  0.24,
-  0.68,
-  0.08,
-  0,
-  0,
-  0.24,
-  0.68,
-  0.08,
-  0,
-  0,
-  0.24,
-  0.68,
-  0.08,
-  0,
-  0,
-  0,
-  0,
-  0,
-  1,
-  0,
-];
+  final String message;
+}
+
+(Uint8List, int, int)? _preparePhoto(Uint8List bytes) {
+  final decoded = image.decodeImage(bytes);
+  if (decoded == null) return null;
+
+  // Physically rotate pixels from EXIF before encoding so iPhone photos stay upright.
+  var upright = image.bakeOrientation(decoded);
+  final longestSide = upright.width > upright.height
+      ? upright.width
+      : upright.height;
+  if (longestSide > PawketPhotoFilter.maxOutputDimension) {
+    if (upright.width >= upright.height) {
+      upright = image.copyResize(
+        upright,
+        width: PawketPhotoFilter.maxOutputDimension,
+        interpolation: image.Interpolation.average,
+      );
+    } else {
+      upright = image.copyResize(
+        upright,
+        height: PawketPhotoFilter.maxOutputDimension,
+        interpolation: image.Interpolation.average,
+      );
+    }
+  }
+  final polished = image.adjustColor(
+    upright,
+    contrast: 1.025,
+    saturation: 1.035,
+    brightness: 1.008,
+    amount: 0.7,
+  );
+  return (
+    image.encodeJpg(polished, quality: 86),
+    polished.width,
+    polished.height,
+  );
+}

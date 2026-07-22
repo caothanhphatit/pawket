@@ -1,6 +1,11 @@
+import 'dart:convert';
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:pawket_mobile/app/bootstrap/app_providers.dart';
 import 'package:pawket_mobile/app/theme/pawket_theme.dart';
 import 'package:pawket_mobile/app/widgets/pawket_scaffold.dart';
@@ -106,25 +111,32 @@ class AccountScreen extends ConsumerWidget {
                 leading: PetAvatar(pet: pet),
                 title: Text(pet.name),
                 subtitle: Text('${pet.speciesLabel} · Owner'),
-                trailing: const Icon(Icons.chevron_right),
-                onTap: () {
-                  ref.read(activePetIdProvider.notifier).select(pet.id);
-                  context.go('/profile');
-                },
+                trailing: pet.id == ref.watch(activePetIdProvider)
+                    ? const Icon(Icons.check, color: PawketColors.leaf)
+                    : null,
               ),
             ),
           const SizedBox(height: 24),
-          const Card(
+          Card(
             child: Column(
               children: [
                 ListTile(
-                  leading: Icon(Icons.notifications_outlined),
-                  title: Text('Notifications'),
-                  subtitle: Text('Coming after the private beta'),
-                  enabled: false,
+                  leading: const Icon(Icons.notifications_outlined),
+                  title: const Text('Notifications'),
+                  subtitle: const Text('Daily memory reminder'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => context.push('/settings/reminders'),
                 ),
-                Divider(height: 1),
+                const Divider(height: 1),
                 ListTile(
+                  leading: const Icon(Icons.download_outlined),
+                  title: const Text('Export Pawket data'),
+                  subtitle: const Text('Portable JSON copy'),
+                  trailing: const Icon(Icons.ios_share_outlined),
+                  onTap: () => _exportData(context, ref),
+                ),
+                const Divider(height: 1),
+                const ListTile(
                   leading: Icon(Icons.shield_outlined),
                   title: Text('Privacy and permissions'),
                   subtitle: Text('Managed per pet for now'),
@@ -135,6 +147,34 @@ class AccountScreen extends ConsumerWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+Future<void> _exportData(BuildContext context, WidgetRef ref) async {
+  final messenger = ScaffoldMessenger.of(context);
+  try {
+    final response = await ref
+        .read(apiClientProvider)
+        .get<Object>('/users/me/export');
+    final directory = await getTemporaryDirectory();
+    final file = File('${directory.path}/pawket-data-export.json');
+    await file.writeAsString(
+      const JsonEncoder.withIndent('  ').convert(response.data),
+      flush: true,
+    );
+    if (!context.mounted) return;
+    final box = context.findRenderObject()! as RenderBox;
+    await SharePlus.instance.share(
+      ShareParams(
+        text: 'My Pawket data export',
+        files: [XFile(file.path, mimeType: 'application/json')],
+        sharePositionOrigin: box.localToGlobal(Offset.zero) & box.size,
+      ),
+    );
+  } catch (_) {
+    messenger.showSnackBar(
+      const SnackBar(content: Text('Could not export Pawket data.')),
     );
   }
 }
