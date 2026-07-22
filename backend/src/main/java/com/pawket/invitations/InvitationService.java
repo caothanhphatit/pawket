@@ -7,6 +7,7 @@ import com.pawket.invitations.InvitationDtos.InvitationPreviewResponse;
 import com.pawket.invitations.InvitationDtos.PendingInvitationResponse;
 import com.pawket.shared.error.ApiException;
 import com.pawket.posts.authorization.PetAuthorization;
+import com.pawket.notifications.NotificationService;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.LockModeType;
@@ -31,11 +32,17 @@ public class InvitationService {
     private final EntityManager entityManager;
     private final PetAuthorization authorization;
     private final AuditService auditService;
+    private final NotificationService notifications;
 
-    public InvitationService(EntityManager entityManager, PetAuthorization authorization, AuditService auditService) {
+    public InvitationService(
+            EntityManager entityManager,
+            PetAuthorization authorization,
+            AuditService auditService,
+            NotificationService notifications) {
         this.entityManager = entityManager;
         this.authorization = authorization;
         this.auditService = auditService;
+        this.notifications = notifications;
     }
 
     @Transactional
@@ -141,6 +148,8 @@ public class InvitationService {
         invitation.acceptedByUserId = actorId;
         invitation.acceptedAt = now;
         auditService.record(actorId, "INVITATION_ACCEPTED", "INVITATION", invitation.id);
+        notifications.notifyInvitationAccepted(
+                actorId, invitation.inviterUserId, invitation.id, invitation.petId);
         return new InvitationAcceptedResponse(invitation.petId, invitation.requestedRole, now);
     }
 

@@ -1,6 +1,6 @@
 # Pawket Backend
 
-Quarkus `3.37.3` modular-monolith API for Pawket's pet profiles, memberships, memories, media, feed, reactions, and invitations.
+Quarkus `3.37.3` modular-monolith API for Pawket's pet profiles, memberships, memories, private social interactions, media, and invitations.
 
 ## Requirements
 
@@ -76,6 +76,10 @@ All application endpoints are under `/api/v1`:
 - Media: create a signed upload intent, upload directly to private S3-compatible storage, complete/verify the upload, and authorize content access.
 - Memories: create/read posts, retrieve a cursor-paginated feed, and retrieve each pet's cursor-paginated timeline.
 - Reactions: upsert or remove the current user's reaction to a post.
+- Reaction people and member profiles: list visible reactors and expose only shared pets and shared non-private memories.
+- Comments: create/list under an accessible memory, edit your own comment, and soft-delete your own comment. The memory author or an owner of a tagged pet can moderate-delete comments. Comments are one level and limited to 500 characters.
+- Notification inbox: cursor-paginated `GET /notifications`, `GET /notifications/unread-count`, `POST /notifications/{notificationId}/read`, and `POST /notifications/read-all`. Inbox events cover new member-visible memories, reactions, comments, and accepted invitations; remote push is intentionally deferred.
+- Safety: directional block/unblock, post/comment reports, reporter status history, and an admin-only pending-report queue. Blocking is enforced in both directions for member-visible posts and interactions.
 - Invitations: owner-created role invitations, token preview, and acceptance.
 
 Authorization is membership-based. Owners and caretakers can edit pet data; followers are read-only. Reads and multi-pet posts are checked against active memberships, and media remains in the private bucket behind authorized signed downloads.
@@ -90,6 +94,7 @@ Defaults are defined in `src/main/resources/application.properties` and can be o
 | `DB_USERNAME` / `DB_PASSWORD` | `pawket` / `pawket` | Database credentials |
 | `OIDC_ENABLED` | `false` | Enable the production authentication boundary |
 | `DEV_USER_ID` | seeded development UUID | Default local actor |
+| `ADMIN_USER_IDS` | empty | Comma-separated internal user UUIDs allowed to read the moderation queue |
 | `S3_ENDPOINT` | `http://localhost:9000` | Internal S3-compatible endpoint |
 | `S3_PUBLIC_ENDPOINT` | `http://localhost:9000` | Endpoint embedded in client-facing signed URLs |
 | `S3_REGION` | `us-east-1` | Signing region |
@@ -130,6 +135,6 @@ Native packaging is optional and requires GraalVM, or a working container runtim
 
 ## MVP boundaries
 
-This service intentionally does not yet implement AI pet identification, marketplace/payment flows, ownership transfer, push notifications, moderation tooling, or production identity-provider/deployment configuration.
+This service intentionally does not yet implement AI pet identification, marketplace/payment flows, ownership transfer, remote push notifications, a full moderator dashboard, or production identity-provider/deployment configuration.
 
 Architecture, security, API, data, and coding policies are maintained in [the engineering handbook](../discussion/engineering/README.md).

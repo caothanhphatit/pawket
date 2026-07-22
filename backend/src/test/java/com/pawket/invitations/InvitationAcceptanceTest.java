@@ -1,6 +1,7 @@
 package com.pawket.invitations;
 
 import static io.restassured.RestAssured.given;
+import static org.hamcrest.Matchers.equalTo;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -110,6 +111,13 @@ class InvitationAcceptanceTest {
                 .setParameter("id", invitationId)
                 .getSingleResult();
         assertTrue(acceptedBy.equals(FIRST_USER) || acceptedBy.equals(SECOND_USER));
+
+        given()
+                .when().get("/api/v1/notifications")
+                .then().statusCode(200)
+                .body("data.find { it.type == 'INVITATION_ACCEPTED' && it.invitationId == '%s' }.actor.id"
+                                .formatted(invitationId),
+                        equalTo(acceptedBy.toString()));
     }
 
     private int accept(CountDownLatch start, UUID actorId, String token) throws InterruptedException {

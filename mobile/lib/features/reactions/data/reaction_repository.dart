@@ -1,6 +1,7 @@
 import '../../../core/network/api_client.dart';
 import '../../../core/network/api_models.dart';
 import '../../posts/data/post_dto.dart';
+import 'reaction_person_dto.dart';
 
 abstract interface class ReactionRepository {
   Future<ReactionSummaryDto> setReaction({
@@ -10,6 +11,7 @@ abstract interface class ReactionRepository {
   });
 
   Future<ReactionSummaryDto> removeReaction(String postId);
+  Future<List<ReactionPersonDto>> listPeople(String postId);
 }
 
 class RemoteReactionRepository implements ReactionRepository {
@@ -38,5 +40,16 @@ class RemoteReactionRepository implements ReactionRepository {
     return ReactionSummaryDto.fromJson(
       requireJsonMap(unwrapData(response.data), context: 'reaction summary'),
     );
+  }
+
+  @override
+  Future<List<ReactionPersonDto>> listPeople(String postId) async {
+    final response = await _apiClient.get<Object>(
+      '/posts/$postId/reaction/people',
+    );
+    return requireJsonList(
+      unwrapData(response.data),
+      context: 'reaction people',
+    ).map(ReactionPersonDto.fromJson).toList(growable: false);
   }
 }

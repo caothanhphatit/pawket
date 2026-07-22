@@ -8,6 +8,7 @@ import '../../feed/application/feed_providers.dart';
 import '../../memberships/application/membership_providers.dart';
 import '../../milestones/application/milestone_providers.dart';
 import '../../milestones/presentation/milestone_section.dart';
+import '../../notifications/presentation/notification_badge.dart';
 import '../../posts/data/post_dto.dart';
 import '../application/pet_providers.dart';
 import '../data/pet_dto.dart';
@@ -74,6 +75,11 @@ class _ProfileContent extends ConsumerWidget {
                       'Profile',
                       style: Theme.of(context).textTheme.headlineLarge,
                     ),
+                  ),
+                  IconButton(
+                    onPressed: () => context.push('/notifications'),
+                    tooltip: 'Open notifications',
+                    icon: const NotificationBadge(),
                   ),
                   IconButton(
                     onPressed: () => context.go('/you'),

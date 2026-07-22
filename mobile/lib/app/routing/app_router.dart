@@ -7,6 +7,7 @@ import 'package:pawket_mobile/features/invitations/presentation/create_invitatio
 import 'package:pawket_mobile/features/invitations/presentation/invitation_screen.dart';
 import 'package:pawket_mobile/features/memberships/presentation/members_screen.dart';
 import 'package:pawket_mobile/features/milestones/presentation/create_milestone_screen.dart';
+import 'package:pawket_mobile/features/notifications/presentation/notification_inbox_screen.dart';
 import 'package:pawket_mobile/features/pets/presentation/create_pet_screen.dart';
 import 'package:pawket_mobile/features/pets/presentation/edit_pet_screen.dart';
 import 'package:pawket_mobile/features/pets/presentation/pet_profile_screen.dart';
@@ -16,6 +17,7 @@ import 'package:pawket_mobile/features/posts/presentation/capture_screen.dart';
 import 'package:pawket_mobile/features/posts/presentation/post_detail_screen.dart';
 import 'package:pawket_mobile/features/posts/data/post_dto.dart';
 import 'package:pawket_mobile/features/reminders/presentation/daily_reminder_screen.dart';
+import 'package:pawket_mobile/features/safety/presentation/user_profile_screen.dart';
 import 'package:pawket_mobile/features/timeline/presentation/pet_calendar_screen.dart';
 import 'package:pawket_mobile/features/timeline/presentation/weekly_recap_screen.dart';
 import 'package:pawket_mobile/features/timeline/presentation/import_memories_screen.dart';
@@ -61,6 +63,16 @@ final appRouter = GoRouter(
       ),
     ),
     GoRoute(path: '/you', builder: (_, _) => const AccountScreen()),
+    GoRoute(path: '/blocked', builder: (_, _) => const BlockedUsersScreen()),
+    GoRoute(
+      path: '/users/:userId',
+      builder: (_, state) =>
+          UserProfileScreen(userId: state.pathParameters['userId']!),
+    ),
+    GoRoute(
+      path: '/notifications',
+      builder: (_, _) => const NotificationInboxScreen(),
+    ),
     GoRoute(
       path: '/settings/reminders',
       builder: (_, _) => const DailyReminderScreen(),

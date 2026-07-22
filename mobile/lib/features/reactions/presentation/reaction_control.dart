@@ -9,11 +9,13 @@ class ReactionControl extends StatefulWidget {
   const ReactionControl({
     required this.summary,
     required this.onChanged,
+    this.onShowPeople,
     super.key,
   });
 
   final ReactionSummaryDto summary;
   final ReactionChanged onChanged;
+  final VoidCallback? onShowPeople;
 
   @override
   State<ReactionControl> createState() => _ReactionControlState();
@@ -57,6 +59,14 @@ class _ReactionControlState extends State<ReactionControl> {
             selected: _summary.currentUserReaction == type,
             enabled: !_updating,
             onTap: () => _select(type),
+          ),
+        if (widget.onShowPeople != null &&
+            _summary.counts.values.fold<int>(0, (sum, value) => sum + value) >
+                0)
+          IconButton(
+            tooltip: 'See who reacted',
+            onPressed: widget.onShowPeople,
+            icon: const Icon(Icons.people_outline, size: 20),
           ),
       ],
     );

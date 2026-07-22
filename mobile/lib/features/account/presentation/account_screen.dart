@@ -11,6 +11,7 @@ import 'package:pawket_mobile/app/theme/pawket_theme.dart';
 import 'package:pawket_mobile/app/widgets/pawket_scaffold.dart';
 import 'package:pawket_mobile/features/pets/application/pet_providers.dart';
 import 'package:pawket_mobile/features/pets/presentation/widgets/pet_avatar.dart';
+import 'package:pawket_mobile/features/notifications/presentation/notification_badge.dart';
 
 import '../data/account_repository.dart';
 
@@ -121,9 +122,17 @@ class AccountScreen extends ConsumerWidget {
             child: Column(
               children: [
                 ListTile(
-                  leading: const Icon(Icons.notifications_outlined),
-                  title: const Text('Notifications'),
-                  subtitle: const Text('Daily memory reminder'),
+                  leading: const NotificationBadge(),
+                  title: const Text('Notification inbox'),
+                  subtitle: const Text('Comments, reactions and pet updates'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => context.push('/notifications'),
+                ),
+                const Divider(height: 1),
+                ListTile(
+                  leading: const Icon(Icons.schedule_outlined),
+                  title: const Text('Daily reminder'),
+                  subtitle: const Text('Choose when Pawket reminds you'),
                   trailing: const Icon(Icons.chevron_right),
                   onTap: () => context.push('/settings/reminders'),
                 ),
@@ -141,6 +150,13 @@ class AccountScreen extends ConsumerWidget {
                   title: Text('Privacy and permissions'),
                   subtitle: Text('Managed per pet for now'),
                   enabled: false,
+                ),
+                const Divider(height: 1),
+                ListTile(
+                  leading: const Icon(Icons.block_outlined),
+                  title: const Text('Blocked members'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => context.push('/blocked'),
                 ),
               ],
             ),

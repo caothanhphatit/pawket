@@ -8,6 +8,7 @@ import jakarta.validation.Valid;
 import jakarta.ws.rs.Consumes;
 import jakarta.ws.rs.DELETE;
 import jakarta.ws.rs.HeaderParam;
+import jakarta.ws.rs.GET;
 import jakarta.ws.rs.PUT;
 import jakarta.ws.rs.Path;
 import jakarta.ws.rs.PathParam;
@@ -52,6 +53,12 @@ public class ReactionResource {
     @DELETE
     public Object delete(@PathParam("postId") UUID postId) {
         return new DataResponse<>(reactionService.delete(currentActor.userId(), postId));
+    }
+
+    @GET
+    @Path("/people")
+    public Object people(@PathParam("postId") UUID postId) {
+        return new DataResponse<>(reactionService.people(currentActor.userId(), postId));
     }
 
     private record ReactionIdempotencyRequest(UUID postId, String type) {}

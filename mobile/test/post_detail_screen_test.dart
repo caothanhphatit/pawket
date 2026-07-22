@@ -2,6 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pawket_mobile/app/bootstrap/app_providers.dart';
+import 'package:pawket_mobile/core/config/api_config.dart';
+import 'package:pawket_mobile/core/network/api_models.dart';
+import 'package:pawket_mobile/features/comments/application/comment_providers.dart';
+import 'package:pawket_mobile/features/comments/data/comment_dto.dart';
+import 'package:pawket_mobile/features/comments/data/comment_repository.dart';
 import 'package:pawket_mobile/features/posts/data/post_dto.dart';
 import 'package:pawket_mobile/features/posts/data/post_repository.dart';
 import 'package:pawket_mobile/features/posts/presentation/post_detail_screen.dart';
@@ -40,11 +45,40 @@ void main() {
 
 Widget _app(_FakePostRepository repository) {
   return ProviderScope(
-    overrides: [postRepositoryProvider.overrideWithValue(repository)],
+    overrides: [
+      apiConfigProvider.overrideWithValue(
+        const ApiConfig(baseUrl: 'https://example.test', devUserId: 'user-1'),
+      ),
+      postRepositoryProvider.overrideWithValue(repository),
+      commentRepositoryProvider.overrideWithValue(_EmptyCommentRepository()),
+    ],
     child: MaterialApp(
       home: PostDetailScreen(postId: 'post-1', initialPost: repository.post),
     ),
   );
+}
+
+class _EmptyCommentRepository implements CommentRepository {
+  @override
+  Future<CommentDto> create(
+    String postId,
+    CreateCommentRequest request, {
+    required String idempotencyKey,
+  }) => throw UnimplementedError();
+
+  @override
+  Future<void> delete(String commentId) => throw UnimplementedError();
+
+  @override
+  Future<CursorPage<CommentDto>> list(String postId) async =>
+      const CursorPage(items: [], hasMore: false);
+
+  @override
+  Future<CommentDto> update(
+    String commentId,
+    UpdateCommentRequest request, {
+    required String idempotencyKey,
+  }) => throw UnimplementedError();
 }
 
 PostDto _post({

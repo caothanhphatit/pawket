@@ -10,14 +10,14 @@ Included:
 - Mandatory first-pet onboarding with up to five optional starter photos, editable profiles, milestones, and Profile-only pet switching.
 - Square camera capture with one subtle default polish, reliable media upload, retry, and current-pet memory publishing.
 - Per-pet feed, newest-first timeline, edit/delete, monthly calendar, old-photo import, and shareable weekly recap.
-- Daily local reminders, reactions, member roles, pending invitation management, and member/private visibility.
+- Daily local reminders, comments, reactions with member lists, notification inbox, member profiles, member roles, invitations, blocking/reporting, and member/private visibility.
 - Quarkus REST API, PostgreSQL persistence, Flyway migrations, and private S3-compatible media storage.
 
 Not included in this MVP:
 
 - Automatic dog/cat or individual-pet identification.
 - Marketplace, buying/selling, payments, or ownership transfer.
-- Remote push notifications, production identity-provider setup, moderation, or production deployment automation.
+- Remote push notifications, production identity-provider setup, full moderator dashboard, or production deployment automation.
 
 Local development uses a fixed development user (or `X-User-Id`) while the OIDC integration boundary remains disabled by default.
 

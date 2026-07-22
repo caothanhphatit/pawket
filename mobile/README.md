@@ -10,7 +10,7 @@ Flutter client for Pawket, targeting web, iOS, and Android. The app starts on th
 - Feed, Home highlights, and newest-first per-pet memory grid.
 - Remote pet, media, post, feed/timeline, reaction, membership, and invitation data layers.
 - Memory edit/delete, monthly calendar, weekly recap sharing, Profile-only old-photo import, milestones, and daily local reminders.
-- Pet members, role management, pending invitation revoke, reactions, and honest loading/error states without fabricated offline data.
+- Pet members, role management, pending invitation revoke, reactions with member lists, one-level comments, notification inbox, minimal member profiles, blocking/reporting, and honest loading/error states without fabricated offline data.
 - Riverpod dependency injection/state management, GoRouter navigation, and Dio networking.
 
 AI identification, marketplace/payment flows, ownership transfer, remote push notifications, and production authentication are outside the current MVP.

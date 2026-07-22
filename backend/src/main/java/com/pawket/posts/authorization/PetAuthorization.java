@@ -44,7 +44,12 @@ public class PetAuthorization {
                         select count(*)
                         from posts p
                         where p.id = :postId and p.status = 'PUBLISHED'
-                          and (p.author_id = :userId or (p.visibility <> 'PRIVATE' and exists (
+                          and (p.author_id = :userId or (p.visibility <> 'PRIVATE'
+                            and not exists (
+                              select 1 from user_blocks b
+                              where (b.blocker_user_id = :userId and b.blocked_user_id = p.author_id)
+                                 or (b.blocker_user_id = p.author_id and b.blocked_user_id = :userId)
+                            ) and exists (
                             select 1 from post_pets pp
                             join pet_memberships pm on pm.pet_id = pp.pet_id
                             where pp.post_id = p.id and pm.user_id = :userId and pm.status = 'ACTIVE'

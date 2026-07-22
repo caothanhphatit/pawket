@@ -51,12 +51,12 @@ Backend:
 
 - Media upload intent, completion, validation, and cleanup.
 - Post creation with one or more pet tags.
-- Single-pet and all-accessible-pets cursor timelines.
+- Single-pet cursor timelines for the currently selected pet.
 - Signed media delivery.
 
 Mobile:
 
-- Camera and photo library permissions.
+- Camera permission, plus a Profile-only old-photo import flow.
 - Local preview and upload progress.
 - Manual multi-pet tagging.
 - Publish flow and timeline states.
@@ -75,14 +75,14 @@ Backend:
 - Expiring hashed invitation tokens.
 - Membership acceptance and role authorization.
 - Reaction create/update/remove.
-- Push notification integration with durable event decisions.
+- One-level comments, durable notification inbox events, blocking and report intake.
 
 Mobile:
 
 - Deep-link invitation acceptance.
 - Member list and role-aware UI.
 - Reactions with optimistic update and rollback.
-- Notification permission and device registration flow.
+- In-app notification inbox with unread state; remote push permission/device registration remains deferred.
 
 Exit criteria:
 
@@ -118,4 +118,3 @@ Exit criteria:
 4. Flutter local persistence choice and whether it is needed in Phase 1.
 5. Media limits, normalization, and delivery/CDN strategy.
 6. Minimum supported iOS and Android versions.
-

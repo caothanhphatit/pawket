@@ -1,12 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../../app/bootstrap/app_providers.dart';
 import '../../../app/theme/pawket_theme.dart';
+import '../../comments/presentation/comments_section.dart';
 import '../../feed/application/feed_providers.dart';
 import '../../reactions/application/reaction_providers.dart';
 import '../../reactions/presentation/reaction_control.dart';
+import '../../safety/application/safety_providers.dart';
 import '../data/post_dto.dart';
 
 final postDetailProvider = FutureProvider.autoDispose.family<PostDto, String>(
@@ -36,6 +39,8 @@ class _PostDetailScreenState extends ConsumerState<PostDetailScreen> {
   @override
   Widget build(BuildContext context) {
     final post = _post;
+    final currentUserId = ref.watch(apiConfigProvider).devUserId;
+    final canManagePost = post != null && post.author.id == currentUserId;
     if (post == null) {
       ref.listen(postDetailProvider(widget.postId), (_, next) {
         next.whenData((value) {
@@ -60,15 +65,22 @@ class _PostDetailScreenState extends ConsumerState<PostDetailScreen> {
             )
           else if (post != null) ...[
             IconButton(
-              onPressed: () => _edit(post),
-              tooltip: 'Edit memory',
-              icon: const Icon(Icons.edit_outlined),
+              onPressed: () => _report(post),
+              tooltip: 'Report memory',
+              icon: const Icon(Icons.flag_outlined),
             ),
-            IconButton(
-              onPressed: () => _delete(post),
-              tooltip: 'Delete memory',
-              icon: const Icon(Icons.delete_outline),
-            ),
+            if (canManagePost) ...[
+              IconButton(
+                onPressed: () => _edit(post),
+                tooltip: 'Edit memory',
+                icon: const Icon(Icons.edit_outlined),
+              ),
+              IconButton(
+                onPressed: () => _delete(post),
+                tooltip: 'Delete memory',
+                icon: const Icon(Icons.delete_outline),
+              ),
+            ],
           ],
         ],
       ),
@@ -141,6 +153,49 @@ class _PostDetailScreenState extends ConsumerState<PostDetailScreen> {
           content: Text('Could not delete this memory. Try again.'),
         ),
       );
+    }
+  }
+
+  Future<void> _report(PostDto post) async {
+    final reason = await showModalBottomSheet<String>(
+      context: context,
+      showDragHandle: true,
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const ListTile(title: Text('Why are you reporting this memory?')),
+            for (final entry in const {
+              'SPAM': 'Spam',
+              'HARASSMENT': 'Harassment',
+              'PRIVACY': 'Privacy concern',
+              'INAPPROPRIATE': 'Inappropriate content',
+              'OTHER': 'Other',
+            }.entries)
+              ListTile(
+                title: Text(entry.value),
+                onTap: () => Navigator.pop(context, entry.key),
+              ),
+          ],
+        ),
+      ),
+    );
+    if (reason == null || !mounted) return;
+    try {
+      await ref
+          .read(safetyRepositoryProvider)
+          .report(targetType: 'POST', targetId: post.id, reason: reason);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Report submitted for review.')),
+        );
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Could not submit this report.')),
+        );
+      }
     }
   }
 }
@@ -340,6 +395,8 @@ class _PostDetailContent extends ConsumerWidget {
                   ),
                   ReactionControl(
                     summary: post.reactions,
+                    onShowPeople: () =>
+                        _showReactionPeople(context, ref, post.id),
                     onChanged: (reaction) {
                       final repository = ref.read(reactionRepositoryProvider);
                       if (reaction == null) {
@@ -359,15 +416,65 @@ class _PostDetailContent extends ConsumerWidget {
                 Text(post.caption!, style: const TextStyle(fontSize: 17)),
               ],
               const SizedBox(height: 12),
-              Text(
-                'by ${post.author.displayName}',
-                style: const TextStyle(color: PawketColors.inkMuted),
+              TextButton(
+                onPressed: () => context.push('/users/${post.author.id}'),
+                child: Text('by ${post.author.displayName}'),
               ),
+              const SizedBox(height: 24),
+              const Divider(),
+              const SizedBox(height: 18),
+              CommentsSection(postId: post.id),
             ],
           ),
         ),
       ],
     );
+  }
+}
+
+Future<void> _showReactionPeople(
+  BuildContext context,
+  WidgetRef ref,
+  String postId,
+) async {
+  try {
+    final people = await ref
+        .read(reactionRepositoryProvider)
+        .listPeople(postId);
+    if (!context.mounted) return;
+    await showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (context) => SafeArea(
+        child: ListView(
+          shrinkWrap: true,
+          children: [
+            const ListTile(title: Text('Reactions')),
+            for (final person in people)
+              ListTile(
+                leading: CircleAvatar(
+                  child: Text(
+                    person.displayName.characters.firstOrNull?.toUpperCase() ??
+                        '?',
+                  ),
+                ),
+                title: Text(person.displayName),
+                trailing: Text(person.type),
+                onTap: () {
+                  Navigator.pop(context);
+                  context.push('/users/${person.userId}');
+                },
+              ),
+          ],
+        ),
+      ),
+    );
+  } catch (_) {
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not load reactions.')),
+      );
+    }
   }
 }
 

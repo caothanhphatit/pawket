@@ -3,6 +3,7 @@ package com.pawket.posts;
 import com.pawket.audit.AuditService;
 import com.pawket.media.MediaDtos.MediaResponse;
 import com.pawket.media.MediaService;
+import com.pawket.notifications.NotificationService;
 import com.pawket.posts.PostDtos.CreatePostRequest;
 import com.pawket.posts.PostDtos.PostPage;
 import com.pawket.posts.PostDtos.PageMeta;
@@ -33,16 +34,19 @@ public class PostService {
     private final PetAuthorization authorization;
     private final AuditService auditService;
     private final MediaService mediaService;
+    private final NotificationService notifications;
 
     public PostService(
             EntityManager entityManager,
             PetAuthorization authorization,
             AuditService auditService,
-            MediaService mediaService) {
+            MediaService mediaService,
+            NotificationService notifications) {
         this.entityManager = entityManager;
         this.authorization = authorization;
         this.auditService = auditService;
         this.mediaService = mediaService;
+        this.notifications = notifications;
     }
 
     @Transactional
@@ -106,8 +110,9 @@ public class PostService {
         if (attachedMedia != mediaIds.size()) {
             throw new BadRequestException("All media must be ready, owned by the author, and unused");
         }
-        auditService.record(actorId, "POST_CREATED", "POST", post.id);
         entityManager.flush();
+        auditService.record(actorId, "POST_CREATED", "POST", post.id);
+        notifications.notifyNewPost(actorId, post.id);
         return get(actorId, post.id);
     }
 
@@ -198,6 +203,11 @@ public class PostService {
                     join pet_memberships pm on pm.pet_id = app.pet_id
                     where app.post_id = p.id and pm.user_id = :actorId and pm.status = 'ACTIVE'
                   )))
+                  and (p.author_id = :actorId or not exists (
+                    select 1 from user_blocks b
+                    where (b.blocker_user_id = :actorId and b.blocked_user_id = p.author_id)
+                       or (b.blocker_user_id = p.author_id and b.blocked_user_id = :actorId)
+                  ))
                 """);
         if (petId != null) sql.append(" and pp.pet_id = :petId");
         if (boundary != null) sql.append(" and (p.captured_at, p.id) < (:capturedAt, :postId)");

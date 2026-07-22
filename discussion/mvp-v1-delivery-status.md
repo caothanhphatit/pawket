@@ -32,6 +32,8 @@ chat, video, friends graph, remote push notifications and medical records.
 - Old-photo import is available from Profile without adding a gallery action to the camera.
 - Memory caption/audience editing, deletion, bounded resize/compression and resumable publish retries.
 - Birthday, home day, first trip and custom milestones.
+- One-level comments with create/edit/delete, post and comment reporting, reaction member lists and minimal shared-member profiles.
+- Durable in-app notification inbox with unread badge/read state, plus block/unblock management.
 
 ## Implemented backend slices
 
@@ -46,6 +48,8 @@ chat, video, friends graph, remote push notifications and medical records.
 - Memory edit/delete with author authorization, version checks and inaccessible deleted media.
 - Media limits plus scheduled cleanup/purge for abandoned uploads.
 - Member role changes, pending invitation listing/revocation and milestone authorization/audit.
+- Durable comments and notification events for new memories, reactions, comments and accepted invitations.
+- Shared-member profiles, two-way block enforcement, report history and an admin-protected moderation queue.
 
 ## External setup before public beta
 
